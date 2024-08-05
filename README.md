@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 # kor_search
 
 PostgreSQL용 한국어 텍스트 검색 확장.
@@ -50,4 +48,4 @@ PostgreSQL용 한국어 텍스트 검색 확장.
 SELECT kor_like('안녕하세요', '안녕');  -- 결과: true
 
 SELECT kor_search_tsvector('안녕하세요', '안녕');  -- 결과: true
->>>>>>> 1641cf0 (initial commit)
+
