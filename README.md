@@ -1,109 +1,109 @@
 # kor_search
 
-PostgreSQL¿ë ÇÑ±¹¾î ÅØ½ºÆ® °Ë»ö È®Àå.
+PostgreSQLìš© í•œêµ­ì–´ í…ìŠ¤íŠ¸ ê²€ìƒ‰ í™•ìž¥.
 
-## ¼³¸í
+## ì„¤ëª…
 
-`kor_search` È®ÀåÀº ÇÑ±¹¾î ÅØ½ºÆ® °Ë»öÀ» À§ÇØ LIKE ¹× tsvector ±â¹Ý °Ë»ö ±â´ÉÀ» Á¦°øÇÕ´Ï´Ù. ¿µ¾î¸¦ ÇÑ±Û·Î º¯È¯ÇÏ¿© LIKE Äõ¸®¸¦ Áö¿øÇÕ´Ï´Ù.
+`kor_search` í™•ìž¥ì€ í•œêµ­ì–´ í…ìŠ¤íŠ¸ ê²€ìƒ‰ì„ ìœ„í•´ LIKE ë° tsvector ê¸°ë°˜ ê²€ìƒ‰ ê¸°ëŠ¥ì„ ì œê³µí•©ë‹ˆë‹¤. ì˜ì–´ë¥¼ í•œê¸€ë¡œ ë³€í™˜í•˜ì—¬ LIKE ì¿¼ë¦¬ë¥¼ ì§€ì›í•©ë‹ˆë‹¤.
 
-## ¼³Ä¡
+## ì„¤ì¹˜
 
-### ·ÎÄÃ PostgreSQL ¶Ç´Â EC2¿¡¼­
+### ë¡œì»¬ PostgreSQL ë˜ëŠ” EC2ì—ì„œ
 
-1. ¸ÕÀú PostgreSQL È®ÀåÀ» ºôµåÇÏ°í ¼³Ä¡ÇÏ·Á¸é ´ÙÀ½ ¸í·É¾î¸¦ ½ÇÇàÇÏ¼¼¿ä:
+1. ë¨¼ì € PostgreSQL í™•ìž¥ì„ ë¹Œë“œí•˜ê³  ì„¤ì¹˜í•˜ë ¤ë©´ ë‹¤ìŒ ëª…ë ¹ì–´ë¥¼ ì‹¤í–‰í•˜ì„¸ìš”:
 
     ```sh
     make
     sudo make install
     ```
 
-2. ±×·± ´ÙÀ½, PostgreSQL µ¥ÀÌÅÍº£ÀÌ½º¿¡ Á¢¼ÓÇÏ¿© È®ÀåÀ» È°¼ºÈ­ÇÕ´Ï´Ù:
+2. ê·¸ëŸ° ë‹¤ìŒ, PostgreSQL ë°ì´í„°ë² ì´ìŠ¤ì— ì ‘ì†í•˜ì—¬ í™•ìž¥ì„ í™œì„±í™”í•©ë‹ˆë‹¤:
 
     ```sh
     psql -U your_username -d your_database
     CREATE EXTENSION kor_search;
     ```
 
-### Amazon RDS¿¡¼­
+### Amazon RDSì—ì„œ
 
-1. RDS ÀÎ½ºÅÏ½º¿¡ Á¢¼ÓÇÕ´Ï´Ù. ¿¹¸¦ µé¾î, `psql`À» »ç¿ëÇÏ¿© Á¢¼ÓÇÒ ¼ö ÀÖ½À´Ï´Ù:
+1. RDS ì¸ìŠ¤í„´ìŠ¤ì— ì ‘ì†í•©ë‹ˆë‹¤. ì˜ˆë¥¼ ë“¤ì–´, `psql`ì„ ì‚¬ìš©í•˜ì—¬ ì ‘ì†í•  ìˆ˜ ìžˆìŠµë‹ˆë‹¤:
 
     ```sh
     psql -h your-rds-endpoint -U your-username -d your-database
     ```
 
-2. `kor_search--1.0.sql` ÆÄÀÏÀÇ ³»¿ëÀ» Á÷Á¢ ½ÇÇàÇÏ¿© È®ÀåÀ» È°¼ºÈ­ÇÕ´Ï´Ù:
+2. `kor_search--1.0.sql` íŒŒì¼ì˜ ë‚´ìš©ì„ ì§ì ‘ ì‹¤í–‰í•˜ì—¬ í™•ìž¥ì„ í™œì„±í™”í•©ë‹ˆë‹¤:
 
     ```sql
     \i path/to/kor_search--1.0.sql
     ```
 
-## ÇÔ¼ö
+## í•¨ìˆ˜
 
-- `kor_like(input_text text, search_text text)`: `search_text`¿¡ ÇØ´çÇÏ´Â synonyms°¡ `input_text`¿¡ Æ÷ÇÔµÇ¾î ÀÖ´ÂÁö LIKE Äõ¸®·Î È®ÀÎÇÕ´Ï´Ù.
-- `kor_search_tsvector(input_text text, search_text text)`: `search_text`¿¡ ÇØ´çÇÏ´Â synonyms°¡ `input_text`ÀÇ tsvector¿¡ Æ÷ÇÔµÇ¾î ÀÖ´ÂÁö È®ÀÎÇÕ´Ï´Ù.
+- `kor_like(input_text text, search_text text)`: `search_text`ì— í•´ë‹¹í•˜ëŠ” synonymsê°€ `input_text`ì— í¬í•¨ë˜ì–´ ìžˆëŠ”ì§€ LIKE ì¿¼ë¦¬ë¡œ í™•ì¸í•©ë‹ˆë‹¤.
+- `kor_search_tsvector(input_text text, search_text text)`: `search_text`ì— í•´ë‹¹í•˜ëŠ” synonymsê°€ `input_text`ì˜ tsvectorì— í¬í•¨ë˜ì–´ ìžˆëŠ”ì§€ í™•ì¸í•©ë‹ˆë‹¤.
 
-## »ç¿ë ¿¹½Ã
+## ì‚¬ìš© ì˜ˆì‹œ
 
-1. `kor_like` ÇÔ¼ö »ç¿ë ¿¹½Ã:
-
-    ```sql
-    -- 'lg' Å°¿öµå·Î '¿¤Áö', '¾ÙÁö'¸¦ °Ë»ö
-    SELECT kor_like('ÀÌ°ÍÀº ¿¤Áö Á¦Ç°ÀÔ´Ï´Ù', 'lg');  -- °á°ú: true
-    SELECT kor_like('ÀÌ°ÍÀº ¾ÙÁö Á¦Ç°ÀÔ´Ï´Ù', 'lg');  -- °á°ú: true
-
-    -- 'samsung' Å°¿öµå·Î '»ï¼º'À» °Ë»ö
-    SELECT kor_like('ÀÌ°ÍÀº »ï¼º Á¦Ç°ÀÔ´Ï´Ù', 'samsung');  -- °á°ú: true
-    ```
-
-2. `kor_search_tsvector` ÇÔ¼ö »ç¿ë ¿¹½Ã:
+1. `kor_like` í•¨ìˆ˜ ì‚¬ìš© ì˜ˆì‹œ:
 
     ```sql
-    -- 'lg' Å°¿öµå·Î '¿¤Áö', '¾ÙÁö'¸¦ °Ë»ö
-    SELECT kor_search_tsvector('ÀÌ°ÍÀº ¿¤Áö Á¦Ç°ÀÔ´Ï´Ù', 'lg');  -- °á°ú: true
-    SELECT kor_search_tsvector('ÀÌ°ÍÀº ¾ÙÁö Á¦Ç°ÀÔ´Ï´Ù', 'lg');  -- °á°ú: true
+    -- 'lg' í‚¤ì›Œë“œë¡œ 'ì—˜ì§€', 'ì•¨ì§€'ë¥¼ ê²€ìƒ‰
+    SELECT kor_like('ì´ê²ƒì€ ì—˜ì§€ ì œí’ˆìž…ë‹ˆë‹¤', 'lg');  -- ê²°ê³¼: true
+    SELECT kor_like('ì´ê²ƒì€ ì•¨ì§€ ì œí’ˆìž…ë‹ˆë‹¤', 'lg');  -- ê²°ê³¼: true
 
-    -- 'samsung' Å°¿öµå·Î '»ï¼º'À» °Ë»ö
-    SELECT kor_search_tsvector('ÀÌ°ÍÀº »ï¼º Á¦Ç°ÀÔ´Ï´Ù', 'samsung');  -- °á°ú: true
+    -- 'samsung' í‚¤ì›Œë“œë¡œ 'ì‚¼ì„±'ì„ ê²€ìƒ‰
+    SELECT kor_like('ì´ê²ƒì€ ì‚¼ì„± ì œí’ˆìž…ë‹ˆë‹¤', 'samsung');  -- ê²°ê³¼: true
     ```
 
-## ´Ü¾î º¯È¯ Å×ÀÌºí °ü¸®
+2. `kor_search_tsvector` í•¨ìˆ˜ ì‚¬ìš© ì˜ˆì‹œ:
 
-´Ü¾î º¯È¯ Å×ÀÌºí¿¡ »õ·Î¿î Å°¿öµå¿Í À¯»ç¾î¸¦ Ãß°¡ÇÒ ¼ö ÀÖ½À´Ï´Ù. ¿¹¸¦ µé¾î, 'apple' Å°¿öµå¿¡ ´ëÇÑ À¯»ç¾î¸¦ Ãß°¡ÇÏ·Á¸é ´ÙÀ½°ú °°ÀÌ ÇÕ´Ï´Ù:
+    ```sql
+    -- 'lg' í‚¤ì›Œë“œë¡œ 'ì—˜ì§€', 'ì•¨ì§€'ë¥¼ ê²€ìƒ‰
+    SELECT kor_search_tsvector('ì´ê²ƒì€ ì—˜ì§€ ì œí’ˆìž…ë‹ˆë‹¤', 'lg');  -- ê²°ê³¼: true
+    SELECT kor_search_tsvector('ì´ê²ƒì€ ì•¨ì§€ ì œí’ˆìž…ë‹ˆë‹¤', 'lg');  -- ê²°ê³¼: true
+
+    -- 'samsung' í‚¤ì›Œë“œë¡œ 'ì‚¼ì„±'ì„ ê²€ìƒ‰
+    SELECT kor_search_tsvector('ì´ê²ƒì€ ì‚¼ì„± ì œí’ˆìž…ë‹ˆë‹¤', 'samsung');  -- ê²°ê³¼: true
+    ```
+
+## ë‹¨ì–´ ë³€í™˜ í…Œì´ë¸” ê´€ë¦¬
+
+ë‹¨ì–´ ë³€í™˜ í…Œì´ë¸”ì— ìƒˆë¡œìš´ í‚¤ì›Œë“œì™€ ìœ ì‚¬ì–´ë¥¼ ì¶”ê°€í•  ìˆ˜ ìžˆìŠµë‹ˆë‹¤. ì˜ˆë¥¼ ë“¤ì–´, 'apple' í‚¤ì›Œë“œì— ëŒ€í•œ ìœ ì‚¬ì–´ë¥¼ ì¶”ê°€í•˜ë ¤ë©´ ë‹¤ìŒê³¼ ê°™ì´ í•©ë‹ˆë‹¤:
 
 ```sql
 INSERT INTO kor_search_word_transform (keyword, synonyms)
-VALUES ('apple', ARRAY['¾ÖÇÃ', '»ç°ú']);
+VALUES ('apple', ARRAY['ì• í”Œ', 'ì‚¬ê³¼']);
+```
+## ì œê±°
 
-## Á¦°Å
+### ë¡œì»¬ PostgreSQL ë˜ëŠ” EC2ì—ì„œ
 
-### ·ÎÄÃ PostgreSQL ¶Ç´Â EC2¿¡¼­
+ë¡œì»¬ PostgreSQL ë˜ëŠ” EC2ì—ì„œ í™•ìž¥ì„ ì œê±°í•˜ë ¤ë©´ ë‹¤ìŒ ë‹¨ê³„ë¥¼ ë”°ë¥´ì„¸ìš”:
 
-·ÎÄÃ PostgreSQL ¶Ç´Â EC2¿¡¼­ È®ÀåÀ» Á¦°ÅÇÏ·Á¸é ´ÙÀ½ ´Ü°è¸¦ µû¸£¼¼¿ä:
-
-1. PostgreSQL µ¥ÀÌÅÍº£ÀÌ½º¿¡ Á¢¼ÓÇÕ´Ï´Ù.
+1. PostgreSQL ë°ì´í„°ë² ì´ìŠ¤ì— ì ‘ì†í•©ë‹ˆë‹¤.
 
     ```sh
     psql -U your_username -d your_database
     ```
 
-2. È®ÀåÀ» Á¦°ÅÇÕ´Ï´Ù.
+2. í™•ìž¥ì„ ì œê±°í•©ë‹ˆë‹¤.
 
     ```sql
     DROP EXTENSION kor_search;
     ```
 
-### Amazon RDS¿¡¼­
+### Amazon RDSì—ì„œ
 
-Amazon RDS¿¡¼­ È®ÀåÀ» Á¦°ÅÇÏ·Á¸é ´ÙÀ½ ´Ü°è¸¦ µû¸£¼¼¿ä:
+Amazon RDSì—ì„œ í™•ìž¥ì„ ì œê±°í•˜ë ¤ë©´ ë‹¤ìŒ ë‹¨ê³„ë¥¼ ë”°ë¥´ì„¸ìš”:
 
-1. RDS ÀÎ½ºÅÏ½º¿¡ Á¢¼ÓÇÕ´Ï´Ù.
+1. RDS ì¸ìŠ¤í„´ìŠ¤ì— ì ‘ì†í•©ë‹ˆë‹¤.
 
     ```sh
     psql -h your-rds-endpoint -U your-username -d your-database
     ```
 
-2. `uninstall_kor_search.sql` ÆÄÀÏÀÇ ³»¿ëÀ» Á÷Á¢ ½ÇÇàÇÏ¿© È®ÀåÀ» Á¦°ÅÇÕ´Ï´Ù:
+2. `uninstall_kor_search.sql` íŒŒì¼ì˜ ë‚´ìš©ì„ ì§ì ‘ ì‹¤í–‰í•˜ì—¬ í™•ìž¥ì„ ì œê±°í•©ë‹ˆë‹¤:
 
     ```sql
     \i path/to/uninstall_kor_search.sql
