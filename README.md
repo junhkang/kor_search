@@ -8,7 +8,7 @@ PostgreSQL용 한국어 텍스트 검색 확장.
 
 `kor_search` 확장은 한국어 텍스트 검색을 위해 LIKE 및 tsvector 기반 검색 기능을 제공합니다. 영어를 한글로 변환하여 LIKE 쿼리를 지원합니다.
 
-## 설치
+## 설치 
 
 ### 로컬 PostgreSQL 또는 EC2에서
 
