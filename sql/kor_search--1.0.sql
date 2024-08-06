@@ -59,3 +59,11 @@ BEGIN
     RETURN keyword_found;
 END;
 $$ LANGUAGE plpgsql;
+
+-- 정규식 검색 함수 생성
+CREATE OR REPLACE FUNCTION kor_regex_search(input_text text, pattern text)
+RETURNS boolean AS $$
+BEGIN
+    RETURN input_text ~* pattern;
+END;
+$$ LANGUAGE plpgsql;
