@@ -19,7 +19,6 @@ CREATE OR REPLACE FUNCTION kor_like(input_text text, search_text text)
 RETURNS boolean AS $$
 DECLARE
     synonym text;
-    keyword_found boolean := false;
 BEGIN
     FOR synonym IN
         SELECT unnest(synonyms)
@@ -27,12 +26,11 @@ BEGIN
         WHERE keyword = lower(search_text)
     LOOP
         IF lower(input_text) LIKE '%' || lower(synonym) || '%' THEN
-            keyword_found := true;
-            EXIT;
+            RETURN true;
         END IF;
     END LOOP;
 
-    RETURN keyword_found;
+    RETURN false;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -42,23 +40,23 @@ RETURNS boolean AS $$
 DECLARE
     vec tsvector;
     synonym text;
-    keyword_found boolean := false;
 BEGIN
+    vec := to_tsvector('english', input_text);
+
     FOR synonym IN
         SELECT unnest(synonyms)
         FROM kor_search_word_transform
         WHERE keyword = lower(search_text)
     LOOP
-        vec := to_tsvector('english', input_text);
         IF vec @@ plainto_tsquery('english', synonym) THEN
-            keyword_found := true;
-            EXIT;
+            RETURN true;
         END IF;
     END LOOP;
 
-    RETURN keyword_found;
+    RETURN false;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -- 정규식 검색 함수 생성
 CREATE OR REPLACE FUNCTION kor_regex_search(input_text text, pattern text)
