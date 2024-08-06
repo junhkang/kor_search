@@ -5,10 +5,15 @@ CREATE TABLE IF NOT EXISTS kor_search_word_transform (
     keyword text,
     synonyms text[]
 );
+-- keyword 컬럼에 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_kor_search_keyword ON kor_search_word_transform (keyword);
+
+-- synonyms 배열의 각 요소에 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_kor_search_synonyms ON kor_search_word_transform USING gin (synonyms);
 
 -- 초기 데이터 삽입
 \i kor_search_data.sql
-
+select * from kor_search_word_transform;
 -- LIKE 검색 함수 생성
 CREATE OR REPLACE FUNCTION kor_like(input_text text, search_text text)
 RETURNS boolean AS $$
@@ -16,7 +21,6 @@ DECLARE
     synonym text;
     keyword_found boolean := false;
 BEGIN
-    -- search_text에 해당하는 synonyms 검색
     FOR synonym IN
         SELECT unnest(synonyms)
         FROM kor_search_word_transform
@@ -40,7 +44,6 @@ DECLARE
     synonym text;
     keyword_found boolean := false;
 BEGIN
-    -- search_text에 해당하는 synonyms 검색
     FOR synonym IN
         SELECT unnest(synonyms)
         FROM kor_search_word_transform
