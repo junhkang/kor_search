@@ -38,6 +38,12 @@ PostgreSQL용 한국어 텍스트 검색 확장.
     \i path/to/kor_search--1.0.sql
     ```
 
+3. 초기 데이터를 삽입하려면 `kor_search_data.sql` 파일의 내용을 실행합니다:
+
+    ```sql
+    \i path/to/kor_search_data.sql
+    ```
+
 ## 함수
 
 - `kor_like(input_text text, search_text text)`: `search_text`에 해당하는 synonyms가 `input_text`에 포함되어 있는지 LIKE 쿼리로 확인합니다.
