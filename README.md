@@ -10,7 +10,7 @@ PostgreSQL용 한국어 텍스트 검색 확장.
 
 ### 로컬 PostgreSQL 또는 EC2에서
 
-1. 먼저 PostgreSQL 확장을 빌드하고 설치하려면 다음 명령어를 실행하세요:
+1. 먼저 PostgreSQL 익스텐션을 빌드하고 설치하려면 다음 명령어를 실행하세요:
 
     ```sh
     make
@@ -36,12 +36,6 @@ PostgreSQL용 한국어 텍스트 검색 확장.
 
     ```sql
     \i path/to/kor_search--1.0.sql
-    ```
-
-3. 초기 데이터를 삽입하려면 `kor_search_data.sql` 파일의 내용을 실행합니다:
-
-    ```sql
-    \i path/to/kor_search_data.sql
     ```
 
 ## 함수

@@ -13,7 +13,7 @@ CREATE INDEX IF NOT EXISTS idx_kor_search_synonyms ON kor_search_word_transform 
 
 -- 초기 데이터 삽입
 \i kor_search_data.sql
-select * from kor_search_word_transform;
+
 -- LIKE 검색 함수 생성
 CREATE OR REPLACE FUNCTION kor_like(input_text text, search_text text)
 RETURNS boolean AS $$
