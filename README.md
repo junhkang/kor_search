@@ -48,6 +48,7 @@ PostgreSQL용 한국어 텍스트 검색 확장.
 
 - `kor_like(input_text text, search_text text)`: `search_text`에 해당하는 synonyms가 `input_text`에 포함되어 있는지 LIKE 쿼리로 확인합니다.
 - `kor_search_tsvector(input_text text, search_text text)`: `search_text`에 해당하는 synonyms가 `input_text`의 tsvector에 포함되어 있는지 확인합니다.
+- `kor_regex_search(input_text text, pattern text)`: 정규식 패턴이 `input_text`에 매칭되는지 확인합니다.
 
 ## 사용 예시
 
@@ -72,7 +73,15 @@ PostgreSQL용 한국어 텍스트 검색 확장.
     -- 'samsung' 키워드로 '삼성'을 검색
     SELECT kor_search_tsvector('이것은 삼성 제품입니다', 'samsung');  -- 결과: true
     ```
+   
+3. `kor_regex_search` 함수 사용 예시:
 
+    ```sql
+    -- '엘지'와 매칭되는 정규식을 사용하여 검색
+    SELECT kor_regex_search('이것은 엘지 제품입니다', '엘지');  -- 결과: true
+    SELECT kor_regex_search('이것은 LG 제품입니다', '엘지');  -- 결과: false
+    ```
+   
 ## 단어 변환 테이블 관리
 
 단어 변환 테이블에 새로운 키워드와 유사어를 추가할 수 있습니다. 예를 들어, 'apple' 키워드에 대한 유사어를 추가하려면 다음과 같이 합니다:
