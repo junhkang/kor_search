@@ -1,6 +1,6 @@
 -- uninstall_kor_search.sql
-DROP FUNCTION IF EXISTS kor_like(text, text);
+DROP FUNCTION IF EXISTS kor_like_search(text, text);
 DROP FUNCTION IF EXISTS kor_search_tsvector(text, text);
-DROP INDEX IF EXISTS idx_kor_search_keyword;
-DROP INDEX IF EXISTS idx_kor_search_synonyms;
+DROP FUNCTION IF EXISTS kor_regex_search(text, text);
+DROP TABLE IF EXISTS kor_search_word_synonyms;
 DROP TABLE IF EXISTS kor_search_word_transform;
