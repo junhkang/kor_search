@@ -1,3 +1,5 @@
+-- kor_search_data.sql
+
 -- 단어 변환 테이블 생성
 CREATE TABLE IF NOT EXISTS kor_search_word_transform (
     id serial PRIMARY KEY,
@@ -70,3 +72,18 @@ VALUES
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'data science'), '데이터 사이언스'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'deep learning'), '딥러닝'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'deep learning'), '심층 학습');
+
+CREATE FUNCTION kor_search_like(input_text text, search_text text)
+RETURNS boolean
+AS 'kor_search', 'kor_search_like'
+LANGUAGE C STRICT;
+
+CREATE FUNCTION kor_search_tsvector(input_text text, search_text text)
+RETURNS boolean
+AS 'kor_search', 'kor_search_tsvector'
+LANGUAGE C STRICT;
+
+CREATE FUNCTION kor_search_regex(input_text text, pattern text)
+RETURNS boolean
+AS 'kor_search', 'kor_search_regex'
+LANGUAGE C STRICT;
