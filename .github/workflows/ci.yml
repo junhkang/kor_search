@@ -50,14 +50,20 @@ jobs:
       run: sudo make install
 
     - name: Setup PostgreSQL extension
+      env:
+        PGPASSWORD: postgres
       run: |
         psql -h localhost -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
+      env:
+        PGPASSWORD: postgres
       run: |
         echo "Running tests..."
         psql -h localhost -U postgres -d testdb -f sql/kor_search--1.0.0.sql
 
     - name: Verify installation
+      env:
+        PGPASSWORD: postgres
       run: |
         psql -h localhost -U postgres -d testdb -c "\dx"
