@@ -32,7 +32,7 @@ jobs:
     - name: Wait for PostgreSQL to be ready
       run: |
         for i in {1..30}; do
-          if psql -h localhost -U postgres -d testdb -c "SELECT 1;" > /dev/null 2>&1; then
+          if psql -h postgres -U postgres -d testdb -c "SELECT 1;" > /dev/null 2>&1; then
             echo "PostgreSQL is ready!"
             break
           else
@@ -61,17 +61,17 @@ jobs:
       env:
         PGPASSWORD: postgres
       run: |
-        psql -h localhost -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        psql -h postgres -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
       env:
         PGPASSWORD: postgres
       run: |
         echo "Running tests..."
-        psql -h localhost -U postgres -d testdb -f sql/kor_search--1.0.0.sql
+        psql -h postgres -U postgres -d testdb -f sql/kor_search--1.0.0.sql
 
     - name: Verify installation
       env:
         PGPASSWORD: postgres
       run: |
-        psql -h localhost -U postgres -d testdb -c "\dx"
+        psql -h postgres -U postgres -d testdb -c "\dx"
