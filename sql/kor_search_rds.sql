@@ -1,7 +1,7 @@
 \i kor_search_data.sql
 
 -- LIKE 검색 함수
-CREATE OR REPLACE FUNCTION kor_like_search(input_text text, search_text text)
+CREATE OR REPLACE FUNCTION kor_search_like(input_text text, search_text text)
 RETURNS boolean AS $$
 BEGIN
     RETURN EXISTS (
