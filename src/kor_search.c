@@ -5,9 +5,9 @@
 #include "catalog/pg_type.h"
 #include "executor/spi.h"
 #include "commands/trigger.h"
-#include <math.h>
 #include <string.h>
 #include <ctype.h>
+#include <regex.h>
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
@@ -196,22 +196,99 @@ kor_search_tsvector(PG_FUNCTION_ARGS)
     text *search_text = PG_GETARG_TEXT_PP(1);
     bool result = false;
 
-    // TODO: TSVECTOR 검색 로직 구현
-    result = true; // 임시로 true 반환
+    char *input = text_to_cstring(input_text);
+    char *search = text_to_cstring(search_text);
+
+    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
+    int token_count_search;
+
+    // 검색어 텍스트를 토큰화 (공백 기준으로 분리)
+    tokenize_text(search, tokens_search, &token_count_search, isalpha(search[0]) ? stopwords_english : stopwords_korean);
+
+    char tsquery[8192] = "";
+
+    // 각 토큰에 대해 유사 단어를 찾고 tsquery 생성
+    for (int i = 0; i < token_count_search; i++) {
+        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
+        int similar_count;
+        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
+
+        // 유사 단어가 없으면 해당 토큰 자체를 tsquery에 추가
+        if (similar_count == 0) {
+            strncpy(similar_tokens[0], tokens_search[i], MAX_WORD_LENGTH);
+            similar_tokens[0][MAX_WORD_LENGTH - 1] = '\0';
+            similar_count = 1;
+        }
+
+        if (i > 0 && strlen(tsquery) > 0) {
+            strcat(tsquery, " & ");  // AND 연산자로 연결 (모든 토큰이 포함되어야 하므로)
+        }
+
+        strcat(tsquery, "(");
+        for (int j = 0; j < similar_count; j++) {
+            if (j > 0) {
+                strcat(tsquery, " | ");  // OR 연산자로 유사 단어들 연결
+            }
+            strcat(tsquery, similar_tokens[j]);
+        }
+        strcat(tsquery, ")");
+    }
+
+    // tsquery가 비어있으면 false 반환
+    if (strlen(tsquery) == 0) {
+        PG_RETURN_BOOL(false);
+    }
+
+    // tsvector 쿼리를 통해 검색 수행
+    char query[8192];
+    snprintf(query, sizeof(query),
+             "SELECT to_tsvector('english', '%s') @@ to_tsquery('english', '%s');",
+             input, tsquery);
+
+    elog(INFO, "Generated query: %s", query);  // 쿼리 출력
+
+    SPI_connect();
+    int ret = SPI_execute(query, true, 0);
+    if (ret > 0 && SPI_processed > 0) {
+        result = (strcmp(SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1), "t") == 0);
+    }
+    SPI_finish();
 
     PG_RETURN_BOOL(result);
 }
+
 
 // 정규식 검색 함수
 Datum
 kor_search_regex(PG_FUNCTION_ARGS)
 {
     text *input_text = PG_GETARG_TEXT_PP(0);
-    text *pattern = PG_GETARG_TEXT_PP(1);
+    text *pattern_text = PG_GETARG_TEXT_PP(1);
     bool result = false;
 
-    // TODO: 정규식 검색 로직 구현
-    result = true; // 임시로 true 반환
+    char *input = text_to_cstring(input_text);
+    char *pattern = text_to_cstring(pattern_text);
+
+    regex_t regex;
+    int ret;
+
+    // 정규식 컴파일
+    ret = regcomp(&regex, pattern, REG_EXTENDED);
+    if (ret) {
+        ereport(ERROR, (errmsg("Could not compile regex")));
+    }
+
+    // 입력 텍스트에 정규식이 매칭되는지 확인
+    ret = regexec(&regex, input, 0, NULL, 0);
+    if (!ret) {
+        result = true;  // 매칭됨
+    } else if (ret == REG_NOMATCH) {
+        result = false;  // 매칭되지 않음
+    } else {
+        ereport(ERROR, (errmsg("Regex match failed")));
+    }
+
+    regfree(&regex);  // 정규식 메모리 해제
 
     PG_RETURN_BOOL(result);
 }
