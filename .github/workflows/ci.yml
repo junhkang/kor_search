@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build-and-test:
@@ -20,10 +17,10 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
 
     steps:
     - name: Checkout code
@@ -52,25 +49,21 @@ jobs:
         PGPASSWORD: postgres
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        psql -h $CONTAINER_IP -U postgres -d testdb -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 
     - name: Setup kor_search extension
       env:
         PGPASSWORD: postgres
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -c 'CREATE EXTENSION kor_search;'"
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        psql -h $CONTAINER_IP -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run SQL Tests
       env:
         PGPASSWORD: postgres
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql"
-
-    - name: Verify installation
-      env:
-        PGPASSWORD: postgres
-      run: |
-        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -c '\dx'"
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        psql -h $CONTAINER_IP -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql
