@@ -48,6 +48,10 @@ jobs:
       run: |
         docker exec ${{ steps.get_container_ip.outputs.container_id }} bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
 
+    - name: Create test directory in container
+      run: |
+        docker exec ${{ steps.get_container_ip.outputs.container_id }} bash -c "mkdir -p /usr/src/kor_search/test"
+
     - name: Copy source code to container
       run: |
         docker cp . ${{ steps.get_container_ip.outputs.container_id }}:/usr/src/kor_search
@@ -70,5 +74,5 @@ jobs:
       env:
         PGPASSWORD: postgres
       run: |
-        ls -l /usr/src/kor_search/test/  # Test to check if the file is there
+        ls -l /usr/src/kor_search/test/  # Check if the file is there
         psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql
