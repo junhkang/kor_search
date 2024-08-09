@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string.h>
 #include <ctype.h>
+#include <regex.h>  // 정규식 관련 함수들을 사용하기 위한 헤더 파일
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
@@ -24,6 +25,9 @@ PG_FUNCTION_INFO_V1(kor_search_regex);
 // 불용어 리스트 정의
 const char *stopwords_korean[] = {"는", "은", "이", "가", "을", "를", "에", "에서", "와", "과", "도", "의", NULL};
 const char *stopwords_english[] = {"am", "is", "are", "was", "were", "be", "been", "being", NULL};
+
+// 함수 선언
+static void similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count);
 
 // 단어를 공백으로 토큰화하고 불용어를 처리
 static void tokenize_text(const char *input, char tokens[MAX_WORDS][MAX_WORD_LENGTH], int *token_count, const char **stopwords) {
