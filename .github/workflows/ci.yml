@@ -12,12 +12,6 @@ jobs:
     services:
       postgres:
         image: postgres:16
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_DB: testdb
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
@@ -37,17 +31,22 @@ jobs:
           sleep 1
         done
 
+    - name: Get the container ID for the PostgreSQL service
+      id: get_container_id
+      run: echo "Container ID: $(docker ps -q -f ancestor=postgres:16)"
+      continue-on-error: false
+
     - name: Install PostgreSQL dev libraries in container
       run: |
-        docker exec postgres bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
+        docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
 
     - name: Copy source code to container
       run: |
-        docker cp . postgres:/usr/src/kor_search
+        docker cp . $(docker ps -q -f ancestor=postgres:16):/usr/src/kor_search
 
     - name: Build and install extension in container
       run: |
-        docker exec postgres bash -c "cd /usr/src/kor_search && make && make install"
+        docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "cd /usr/src/kor_search && make && make install"
 
     - name: Setup PostgreSQL extension
       env:
