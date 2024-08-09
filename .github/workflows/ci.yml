@@ -34,8 +34,7 @@ jobs:
     - name: Get the container ID for the PostgreSQL service
       id: get_container_id
       run: echo "Container ID: $(docker ps -q -f ancestor=postgres:16)"
-      continue-on-error: false
-
+    
     - name: Install PostgreSQL dev libraries in container
       run: |
         docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
