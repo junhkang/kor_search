@@ -46,12 +46,13 @@ jobs:
     - name: Build the extension
       run: make
 
-    - name: Install the extension
+    - name: Install the extension locally
       run: sudo make install
 
-    - name: Find installed control file
+    - name: Copy extension files to PostgreSQL container
       run: |
-        find /usr -name kor_search.control
+        docker cp /usr/share/postgresql/16/extension/kor_search.control postgres:/usr/share/postgresql/16/extension/
+        docker cp /usr/lib/postgresql/16/lib/kor_search.so postgres:/usr/lib/postgresql/16/lib/
 
     - name: Setup PostgreSQL extension
       env:
