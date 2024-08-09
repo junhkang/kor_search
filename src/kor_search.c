@@ -257,8 +257,6 @@ kor_search_tsvector(PG_FUNCTION_ARGS)
     PG_RETURN_BOOL(result);
 }
 
-
-// 정규식 검색 함수
 Datum
 kor_search_regex(PG_FUNCTION_ARGS)
 {
@@ -269,13 +267,66 @@ kor_search_regex(PG_FUNCTION_ARGS)
     char *input = text_to_cstring(input_text);
     char *pattern = text_to_cstring(pattern_text);
 
-    regex_t regex;
-    int ret;
+    // 정규식에서 단어 부분만 추출
+    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
+    int token_count_search = 0;
+
+    const char *delimiters = "[]()+*?.|\\^$ ";
+    char *pattern_copy = strdup(pattern); // 패턴을 복사하여 사용
+    char *token = strtok(pattern_copy, delimiters);
+    while (token != NULL && token_count_search < MAX_WORDS) {
+        strncpy(tokens_search[token_count_search], token, MAX_WORD_LENGTH);
+        tokens_search[token_count_search][MAX_WORD_LENGTH - 1] = '\0';
+        token_count_search++;
+        token = strtok(NULL, delimiters);
+    }
+
+    // 확장된 정규식 생성
+    char expanded_pattern[8192] = "";
+    const char *pattern_ptr = pattern;
+
+    for (int i = 0; i < token_count_search; i++) {
+        // 패턴에서 현재 토큰을 찾음
+        char *pos = strstr(pattern_ptr, tokens_search[i]);
+        if (pos != NULL) {
+            // 패턴의 앞부분을 복사
+            strncat(expanded_pattern, pattern_ptr, pos - pattern_ptr);
+
+            // 유사 단어를 찾고 확장된 패턴을 생성
+            char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
+            int similar_count;
+            similar_search_words(tokens_search[i], similar_tokens, &similar_count);
+
+            if (similar_count > 0) {
+                strcat(expanded_pattern, "(");
+                for (int j = 0; j < similar_count; j++) {
+                    if (j > 0) {
+                        strcat(expanded_pattern, "|");
+                    }
+                    strcat(expanded_pattern, similar_tokens[j]);
+                }
+                strcat(expanded_pattern, ")");
+            } else {
+                strcat(expanded_pattern, tokens_search[i]);
+            }
+
+            // 패턴의 남은 부분으로 이동
+            pattern_ptr = pos + strlen(tokens_search[i]);
+        }
+    }
+
+    // 남은 패턴 부분을 추가
+    strcat(expanded_pattern, pattern_ptr);
+
+    free(pattern_copy);  // 복사한 패턴 메모리 해제
+
+    elog(INFO, "Generated expanded pattern: %s", expanded_pattern);
 
     // 정규식 컴파일
-    ret = regcomp(&regex, pattern, REG_EXTENDED);
+    regex_t regex;
+    int ret = regcomp(&regex, expanded_pattern, REG_EXTENDED);
     if (ret) {
-        ereport(ERROR, (errmsg("Could not compile regex")));
+        ereport(ERROR, (errmsg("Could not compile regex: %s", expanded_pattern)));
     }
 
     // 입력 텍스트에 정규식이 매칭되는지 확인
