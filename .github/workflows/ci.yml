@@ -10,7 +10,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     services:
@@ -29,34 +28,30 @@ jobs:
           --health-retries=5
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
 
     - name: Set up PostgreSQL apt repository
       run: |
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
 
     - name: Install dependencies
-      run: sudo apt-get install -y postgresql-server-dev-16
+      run: sudo apt-get install -y postgresql-server-dev-16 postgresql-client build-essential
 
     - name: Build and install extension
       run: |
         make
         sudo make install
 
-    - name: Move and Install Files Manually
+    - name: Set up database for testing
       run: |
-        sudo mv kor_search.control /usr/share/postgresql/16/extension/
-        sudo mv sql/kor_search--1.0.0.sql /usr/share/postgresql/16/extension/
-
-    - name: Run tests
-      env:
-        PGPASSWORD: postgres
-      run: |
+        until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do sleep 1; done
         psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
-        # 각 함수에 대한 테스트 쿼리 실행 및 결과 검사
+    - name: Run tests
+      run: |
         RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_like('나는 밥을 먹었다', '밥');" | xargs)
         if [ "$RESULT" != "t" ]; then echo "kor_search_like test failed"; exit 1; fi
 
