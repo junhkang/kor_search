@@ -58,6 +58,8 @@ jobs:
         sudo make install
 
     - name: Run tests
+      env:
+        PGPASSWORD: postgres  # PostgreSQL 비밀번호 설정
       run: |
         psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
