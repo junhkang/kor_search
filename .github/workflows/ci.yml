@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build-and-test:
@@ -17,10 +20,10 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
 
     steps:
     - name: Checkout code
@@ -29,50 +32,46 @@ jobs:
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y make gcc libpq-dev
 
-    - name: Get PostgreSQL container IP address
-      id: get_container_ip
-      run: |
-        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
-        echo "PostgreSQL container IP: $CONTAINER_IP"
-        echo "::set-output name=container_ip::$CONTAINER_IP"
-        echo "::set-output name=container_id::$CONTAINER_ID"
-
-    - name: Install pg_trgm extension
-      env:
-        PGPASSWORD: postgres
-      run: |
-        psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
-
     - name: Install PostgreSQL dev libraries in container
       run: |
-        docker exec ${{ steps.get_container_ip.outputs.container_id }} bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
-
-    - name: Create test directory in container
-      run: |
-        docker exec ${{ steps.get_container_ip.outputs.container_id }} bash -c "mkdir -p /usr/src/kor_search/test"
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        docker exec $CONTAINER_ID bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
 
     - name: Copy source code to container
       run: |
-        docker cp . ${{ steps.get_container_ip.outputs.container_id }}:/usr/src/kor_search
-
-    - name: Copy test cases to container
-      run: |
-        docker cp test/test_cases.sql ${{ steps.get_container_ip.outputs.container_id }}:/usr/src/kor_search/test/test_cases.sql
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        docker cp . $CONTAINER_ID:/usr/src/kor_search
 
     - name: Build and install extension in container
       run: |
-        docker exec ${{ steps.get_container_ip.outputs.container_id }} bash -c "cd /usr/src/kor_search && make && make install"
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        docker exec $CONTAINER_ID bash -c "cd /usr/src/kor_search && make && make install"
 
     - name: Setup kor_search extension
       env:
         PGPASSWORD: postgres
       run: |
-        psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        psql -h $CONTAINER_IP -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+
+    - name: Copy test cases to container
+      run: |
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        docker cp test/test_cases.sql $CONTAINER_ID:/usr/src/kor_search/test/test_cases.sql
 
     - name: Run SQL Tests
       env:
         PGPASSWORD: postgres
       run: |
-        ls -l /usr/src/kor_search/test/  # Check if the file is there
-        psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        psql -h $CONTAINER_IP -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql
+
+    - name: Verify installation
+      env:
+        PGPASSWORD: postgres
+      run: |
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        psql -h $CONTAINER_IP -U postgres -d testdb -c "\dx"
