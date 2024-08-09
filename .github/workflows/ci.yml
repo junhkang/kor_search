@@ -2,9 +2,6 @@ name: CI
 
 on:
   push:
-      branches:
-        - main
-  pull_request:
     branches:
       - main
 
@@ -28,10 +25,17 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Wait for PostgreSQL to be ready
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          sleep 1
+        done
 
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y postgresql-server-dev-16 make gcc
+      run: sudo apt-get update && sudo apt-get install -y postgresql-client postgresql-server-dev-16 make gcc
 
     - name: Build the extension
       run: make
@@ -41,14 +45,13 @@ jobs:
 
     - name: Setup PostgreSQL extension
       run: |
-        psql -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        psql -h localhost -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
       run: |
-        # 여기에 테스트 스크립트 또는 SQL 쿼리를 실행
         echo "Running tests..."
-        psql -U postgres -d testdb -f sql/kor_search--1.0.0.sql
+        psql -h localhost -U postgres -d testdb -f sql/kor_search--1.0.0.sql
 
     - name: Verify installation
       run: |
-        psql -U postgres -d testdb -c "\dx"
+        psql -h localhost -U postgres -d testdb -c "\dx"
