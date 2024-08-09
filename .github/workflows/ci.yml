@@ -33,7 +33,7 @@ jobs:
 
     - name: Set up PostgreSQL apt repository
       run: |
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
 
@@ -43,10 +43,12 @@ jobs:
 
     - name: Build extension
       run: |
+        cd src
         make
 
     - name: Install extension
       run: |
+        cd src
         sudo make install
         sudo ldconfig
 
@@ -57,6 +59,10 @@ jobs:
 
     - name: Run tests
       run: |
+        # Define SQL test scripts
+        psql -h 127.0.0.1 -U postgres -d testdb -f sql/kor_search--1.0.0.sql
+
+        # Execute tests
         RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_like('나는 밥을 먹었다', '밥');" | xargs)
         if [ "$RESULT" != "t" ]; then echo "kor_search_like test failed"; exit 1; fi
 
@@ -70,6 +76,3 @@ jobs:
         if [ "$RESULT" != "t" ]; then echo "kor_search_regex test failed"; exit 1; fi
 
         echo "All tests passed successfully."
-
-    env:
-      PGPASSWORD: postgres
