@@ -13,13 +13,13 @@ include $(PGXS)
 install:
 	@echo "Installing the extension files..."
 	install -c -m 755 kor_search.so $(DESTDIR)$(libdir)/kor_search.so
-	install -c -m 644 $(EXTENSION).control $(DESTDIR)$(datadir)/extension/$(EXTENSION).control
-	install -c -m 644 $(DATA) $(DESTDIR)$(datadir)/extension/$(DATA)
+	install -c -m 644 kor_search.control $(DESTDIR)$(datadir)/extension/kor_search.control
+	install -c -m 644 sql/kor_search--1.0.0.sql $(DESTDIR)$(datadir)/extension/kor_search--1.0.0.sql
 
 # Optional: Clean up
 clean:
 	rm -f src/kor_search.o
 	rm -f kor_search.so
-	rm -rf /usr/share/postgresql/16/extension/kor_search*
-	rm -rf /usr/lib/postgresql/16/lib/kor_search*
-	rm -rf /usr/lib/postgresql/16/lib/bitcode/kor_search
+	rm -rf $(datadir)/extension/kor_search*
+	rm -rf $(libdir)/kor_search*
+	rm -rf $(libdir)/bitcode/kor_search
