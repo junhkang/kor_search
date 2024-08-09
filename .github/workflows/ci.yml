@@ -10,7 +10,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     services:
@@ -29,7 +28,8 @@ jobs:
           --health-retries=5
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
 
     - name: Set up PostgreSQL apt repository
       run: |
@@ -38,12 +38,15 @@ jobs:
         sudo apt-get update
 
     - name: Install dependencies
-      run: sudo apt-get install -y postgresql-server-dev-16 postgresql-client build-essential
+      run: |
+        sudo apt-get install -y postgresql-server-dev-16 postgresql-client build-essential
 
     - name: Build and install extension
       run: |
+        make clean
         make
         sudo make install
+        sudo ldconfig
 
     - name: Set up database for testing
       run: |
@@ -52,7 +55,6 @@ jobs:
 
     - name: Run tests
       run: |
-        # 각 함수에 대한 테스트 쿼리 실행 및 결과 검사
         RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_like('나는 밥을 먹었다', '밥');" | xargs)
         if [ "$RESULT" != "t" ]; then echo "kor_search_like test failed"; exit 1; fi
 
