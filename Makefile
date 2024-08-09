@@ -1,5 +1,10 @@
 MODULE_big = kor_search
-OBJS = src/kor_search.o  # src 폴더 내의 kor_search.c 파일을 참조하도록 경로 수정
+OBJS = src/kor_search.o
+
+EXTENSION = kor_search
+EXTVERSION = 1.0.0
+
+DATA = sql/$(EXTENSION)--$(EXTVERSION).sql
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
