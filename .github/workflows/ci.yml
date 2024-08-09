@@ -1,0 +1,53 @@
+# .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:13
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Wait for Postgres to be ready before running the tests
+        timeout: 60s
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up PostgreSQL client
+      run: sudo apt-get install -y postgresql-client
+
+    - name: Build and install extension
+      run: |
+        make
+        sudo make install
+
+    - name: Run tests
+      run: |
+        psql -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        # °¢ ÇÔ¼ö¿¡ ´ëÇÑ Å×½ºÆ® Äõ¸®¸¦ ½ÇÇàÇÕ´Ï´Ù.
+        psql -U postgres -d testdb -c "SELECT kor_search_like('³ª´Â ¹äÀ» ¸Ô¾ú´Ù', '¹ä');"
+        psql -U postgres -d testdb -c "SELECT kor_search_similar('I eat rice', '¹ä ¸Ô´Ù');"
+        psql -U postgres -d testdb -c "SELECT kor_search_tsvector('I eat rice', '¹ä ¸Ô´Ù');"
+        psql -U postgres -d testdb -c "SELECT kor_search_regex('I have 2 apples', '[0-9]+ »ç°ú');"
