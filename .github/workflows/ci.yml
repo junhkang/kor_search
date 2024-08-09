@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build-and-test:
@@ -54,6 +51,10 @@ jobs:
     - name: Copy source code to container
       run: |
         docker cp . ${{ steps.get_container_ip.outputs.container_id }}:/usr/src/kor_search
+
+    - name: Copy test cases to container
+      run: |
+        docker cp test/test_cases.sql ${{ steps.get_container_ip.outputs.container_id }}:/usr/src/kor_search/test/test_cases.sql
 
     - name: Build and install extension in container
       run: |
