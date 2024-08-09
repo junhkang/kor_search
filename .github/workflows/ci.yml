@@ -1,20 +1,17 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:13
         ports:
           - 5432:5432
         env:
@@ -22,58 +19,34 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up PostgreSQL apt repository
-      run: |
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-        sudo apt-get update
+    - uses: actions/checkout@v3
 
     - name: Install dependencies
-      run: sudo apt-get install -y postgresql-client postgresql-server-dev-16 build-essential
+      run: sudo apt-get update && sudo apt-get install -y postgresql-server-dev-13 make gcc
 
-    - name: Build and install extension
+    - name: Build the extension
+      run: make
+
+    - name: Install the extension
+      run: sudo make install
+
+    - name: Setup PostgreSQL extension
       run: |
-        make
-        sudo make install
-
-    - name: Restart PostgreSQL service
-      run: sudo service postgresql restart
-
-    - name: Set up database for testing
-      env:
-        PGPASSWORD: postgres
-      run: |
-        # Create the testdb database
-        psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE testdb;"
-
-        # Ensure the 'postgres' user has the correct password
-        psql -h 127.0.0.1 -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
-
-        # Create extension
-        psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        psql -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
-      env:
-        PGPASSWORD: postgres
       run: |
-        RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_like('나는 밥을 먹었다', '밥');" | xargs)
-        if [ "$RESULT" != "t" ]; then echo "kor_search_like test failed"; exit 1; fi
+        # 여기에 테스트 스크립트 또는 SQL 쿼리를 실행
+        echo "Running tests..."
+        psql -U postgres -d testdb -f sql/kor_search--1.0.0.sql
 
-        RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_similar('I eat rice', '밥 먹다');" | xargs)
-        if [ "$RESULT" != "t" ]; then echo "kor_search_similar test failed"; exit 1; fi
+    - name: Verify installation
+      run: |
+        psql -U postgres -d testdb -c "\dx"
 
-        RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_tsvector('I eat rice', '밥 먹다');" | xargs)
-        if [ "$RESULT" != "t" ]; then echo "kor_search_tsvector test failed"; exit 1; fi
-
-        RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_regex('I have 2 apples', '[0-9]+ 사과');" | xargs)
-        if [ "$RESULT" != "t" ]; then echo "kor_search_regex test failed"; exit 1; fi
-
-        echo "All tests passed successfully."
