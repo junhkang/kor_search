@@ -28,14 +28,8 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Add PostgreSQL APT repository
-      run: |
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-        sudo apt-get update
-
     - name: Install dependencies
-      run: sudo apt-get install -y postgresql-client-16 postgresql-server-dev-16 make gcc
+      run: sudo apt-get update && sudo apt-get install -y make gcc libpq-dev
 
     - name: Wait for PostgreSQL to be ready
       run: |
@@ -43,16 +37,17 @@ jobs:
           sleep 1
         done
 
-    - name: Build the extension
-      run: make
-
-    - name: Install the extension locally
-      run: sudo make install
-
-    - name: Copy extension files to PostgreSQL container
+    - name: Install PostgreSQL dev libraries in container
       run: |
-        docker cp /usr/share/postgresql/16/extension/kor_search.control postgres:/usr/share/postgresql/16/extension/
-        docker cp /usr/lib/postgresql/16/lib/kor_search.so postgres:/usr/lib/postgresql/16/lib/
+        docker exec postgres bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
+
+    - name: Copy source code to container
+      run: |
+        docker cp . postgres:/usr/src/kor_search
+
+    - name: Build and install extension in container
+      run: |
+        docker exec postgres bash -c "cd /usr/src/kor_search && make && make install"
 
     - name: Setup PostgreSQL extension
       env:
