@@ -49,6 +49,10 @@ jobs:
     - name: Install the extension
       run: sudo make install
 
+    - name: Find installed control file
+      run: |
+        find /usr -name kor_search.control
+
     - name: Setup PostgreSQL extension
       env:
         PGPASSWORD: postgres
