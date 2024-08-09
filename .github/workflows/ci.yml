@@ -33,6 +33,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install dependencies
+      run: sudo apt-get install -y postgresql-server-dev-13
+
     - name: Set up PostgreSQL client
       run: sudo apt-get install -y postgresql-client
 
@@ -51,8 +54,18 @@ jobs:
     - name: Run tests
       run: |
         psql -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
-        # 각 함수에 대한 테스트 쿼리를 실행합니다.
-        psql -U postgres -d testdb -c "SELECT kor_search_like('나는 밥을 먹었다', '밥');"
-        psql -U postgres -d testdb -c "SELECT kor_search_similar('I eat rice', '밥 먹다');"
-        psql -U postgres -d testdb -c "SELECT kor_search_tsvector('I eat rice', '밥 먹다');"
-        psql -U postgres -d testdb -c "SELECT kor_search_regex('I have 2 apples', '[0-9]+ 사과');"
+
+        # 각 함수에 대한 테스트 쿼리 실행 및 결과 검사
+        RESULT=$(psql -U postgres -d testdb -t -c "SELECT kor_search_like('나는 밥을 먹었다', '밥');" | xargs)
+        if [ "$RESULT" != "t" ]; then echo "kor_search_like test failed"; exit 1; fi
+
+        RESULT=$(psql -U postgres -d testdb -t -c "SELECT kor_search_similar('I eat rice', '밥 먹다');" | xargs)
+        if [ "$RESULT" != "t" ]; then echo "kor_search_similar test failed"; exit 1; fi
+
+        RESULT=$(psql -U postgres -d testdb -t -c "SELECT kor_search_tsvector('I eat rice', '밥 먹다');" | xargs)
+        if [ "$RESULT" != "t" ]; then echo "kor_search_tsvector test failed"; exit 1; fi
+
+        RESULT=$(psql -U postgres -d testdb -t -c "SELECT kor_search_regex('I have 2 apples', '[0-9]+ 사과');" | xargs)
+        if [ "$RESULT" != "t" ]; then echo "kor_search_regex test failed"; exit 1; fi
+
+        echo "All tests passed successfully."
