@@ -49,15 +49,17 @@ jobs:
       run: sudo service postgresql restart
 
     - name: Set up database for testing
+      env:
+        PGPASSWORD: postgres
       run: |
         # Ensure PostgreSQL is ready
         until pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done
 
         # Create the testdb database
-        psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE testdb;"
+        PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE testdb;"
 
         # Ensure the 'postgres' user has the correct password
-        psql -h 127.0.0.1 -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
+        PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
 
         # Create extension
         PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
