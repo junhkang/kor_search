@@ -10,6 +10,7 @@ on:
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
 
     services:
@@ -28,43 +29,31 @@ jobs:
           --health-retries=5
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+    - uses: actions/checkout@v2
 
     - name: Set up PostgreSQL apt repository
       run: |
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
 
     - name: Install dependencies
-      run: sudo apt-get install -y postgresql-server-dev-16 postgresql-client build-essential
+      run: sudo apt-get install -y postgresql-client postgresql-server-dev-16 build-essential
 
     - name: Build and install extension
       run: |
         make
         sudo make install
-        sudo ldconfig  # 확장 설치 후 라이브러리 경로 재설정
-
-    - name: Ensure extension files are in place
-      run: |
-        ls -l /usr/share/postgresql/16/extension/kor_search.control
-        ls -l /usr/lib/postgresql/16/lib/kor_search.so
 
     - name: Restart PostgreSQL service
       run: sudo service postgresql restart
 
-    - name: Wait for PostgreSQL to be ready
+    - name: Set up database for testing
       env:
         PGPASSWORD: postgres
       run: |
-        timeout 60s bash -c 'until pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done'
-        
-    - name: Set up database for testing
-      run: |
-        export PGPASSWORD=postgres
-        timeout 60s bash -c 'until pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done'
-        psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;" --password
+        until pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done
+        psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
       env:
