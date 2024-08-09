@@ -58,7 +58,7 @@ jobs:
       env:
         PGPASSWORD: postgres
       run: |
-        timeout 60s until pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done
+        timeout 60s bash -c 'until pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done'
         
     - name: Set up database for testing
       env:
