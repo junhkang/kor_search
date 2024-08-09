@@ -29,10 +29,18 @@ jobs:
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y make gcc libpq-dev
 
+    - name: Get PostgreSQL container IP address
+      id: get_container_ip
+      run: |
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        echo "PostgreSQL container IP: $CONTAINER_IP"
+        echo "::set-output name=container_ip::$CONTAINER_IP"
+
     - name: Wait for PostgreSQL to be ready
       run: |
         for i in {1..30}; do
-          if psql -h postgres -U postgres -d testdb -c "SELECT 1;" > /dev/null 2>&1; then
+          if psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -c "SELECT 1;" > /dev/null 2>&1; then
             echo "PostgreSQL is ready!"
             break
           else
@@ -41,37 +49,33 @@ jobs:
           fi
         done
 
-    - name: Get the container ID for the PostgreSQL service
-      id: get_container_id
-      run: echo "::set-output name=container_id::$(docker ps -q -f ancestor=postgres:16)"
-
     - name: Install PostgreSQL dev libraries in container
       run: |
-        docker exec ${{ steps.get_container_id.outputs.container_id }} bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
+        docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
 
     - name: Copy source code to container
       run: |
-        docker cp . ${{ steps.get_container_id.outputs.container_id }}:/usr/src/kor_search
+        docker cp . $(docker ps -q -f ancestor=postgres:16):/usr/src/kor_search
 
     - name: Build and install extension in container
       run: |
-        docker exec ${{ steps.get_container_id.outputs.container_id }} bash -c "cd /usr/src/kor_search && make && make install"
+        docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "cd /usr/src/kor_search && make && make install"
 
     - name: Setup PostgreSQL extension
       env:
         PGPASSWORD: postgres
       run: |
-        psql -h postgres -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
       env:
         PGPASSWORD: postgres
       run: |
         echo "Running tests..."
-        psql -h postgres -U postgres -d testdb -f sql/kor_search--1.0.0.sql
+        psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -f sql/kor_search--1.0.0.sql
 
     - name: Verify installation
       env:
         PGPASSWORD: postgres
       run: |
-        psql -h postgres -U postgres -d testdb -c "\dx"
+        psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -c "\dx"
