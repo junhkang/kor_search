@@ -12,6 +12,10 @@ jobs:
     services:
       postgres:
         image: postgres:16
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres  # 슈퍼유저 비밀번호 설정
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
