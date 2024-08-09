@@ -1,13 +1,16 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
 
     services:
@@ -26,26 +29,24 @@ jobs:
           --health-retries=5
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+    - uses: actions/checkout@v2
 
-    - name: Add PostgreSQL APT repository
+    - name: Set up PostgreSQL apt repository
       run: |
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/pgdg.list'
-        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/postgresql.asc
+        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
 
-    - name: Install PostgreSQL client and build tools
-      run: sudo apt-get install -y postgresql-client postgresql-server-dev-15 build-essential
+    - name: Install dependencies
+      run: sudo apt-get install -y postgresql-server-dev-16 postgresql-client build-essential
 
-    - name: Build extension
+    - name: Build and install extension
       run: |
         make
         sudo make install
 
     - name: Set up database for testing
       run: |
-        # Wait for PostgreSQL to be ready
         until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do sleep 1; done
         psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
