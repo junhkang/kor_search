@@ -52,39 +52,25 @@ jobs:
         PGPASSWORD: postgres
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
-        psql -h $CONTAINER_IP -U postgres -d testdb -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
 
     - name: Setup kor_search extension
       env:
         PGPASSWORD: postgres
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
-        psql -h $CONTAINER_IP -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
-
-    - name: Copy test cases to container
-      run: |
-        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        docker cp test/test_cases.sql $CONTAINER_ID:/usr/src/kor_search/test/test_cases.sql
-
-    - name: Verify test file in container
-      run: |
-        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        docker exec $CONTAINER_ID bash -c "ls -l /usr/src/kor_search/test/"
+        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -c 'CREATE EXTENSION kor_search;'"
 
     - name: Run SQL Tests
       env:
         PGPASSWORD: postgres
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
-        psql -h $CONTAINER_IP -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql
+        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql"
 
     - name: Verify installation
       env:
         PGPASSWORD: postgres
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
-        psql -h $CONTAINER_IP -U postgres -d testdb -c "\dx"
+        docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -c '\dx'"
