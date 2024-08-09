@@ -53,7 +53,7 @@ jobs:
         PGPASSWORD: postgres
       run: |
         until pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done
-        psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
       env:
