@@ -46,11 +46,15 @@ jobs:
         sudo make install
 
     - name: Set up database for testing
+      env:
+        PGPASSWORD: postgres
       run: |
-        until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do sleep 1; done
+        until psql -h 127.0.0.1 -U postgres -d testdb -c "SELECT 1" > /dev/null 2>&1; do sleep 1; done
         psql -h 127.0.0.1 -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run tests
+      env:
+        PGPASSWORD: postgres
       run: |
         RESULT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT kor_search_like('나는 밥을 먹었다', '밥');" | xargs)
         if [ "$RESULT" != "t" ]; then echo "kor_search_like test failed"; exit 1; fi
