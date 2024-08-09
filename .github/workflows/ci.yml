@@ -19,8 +19,8 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
-          --health-timeout 30s
-          --health-retries 10
+          --health-timeout 5s
+          --health-retries 3
 
     steps:
     - name: Checkout code
@@ -37,17 +37,11 @@ jobs:
         echo "PostgreSQL container IP: $CONTAINER_IP"
         echo "::set-output name=container_ip::$CONTAINER_IP"
 
-    - name: Wait for PostgreSQL to be ready
+    - name: Install pg_trgm extension
+      env:
+        PGPASSWORD: postgres
       run: |
-        for i in {1..30}; do
-          if psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -c "SELECT 1;" > /dev/null 2>&1; then
-            echo "PostgreSQL is ready!"
-            break
-          else
-            echo "Waiting for PostgreSQL..."
-            sleep 1
-          fi
-        done
+        psql -h ${{ steps.get_container_ip.outputs.container_ip }} -U postgres -d testdb -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 
     - name: Install PostgreSQL dev libraries in container
       run: |
@@ -55,13 +49,13 @@ jobs:
 
     - name: Copy source code to container
       run: |
-        docker cp . $(docker ps -q -f ancestor=postgres:16):/usr/src/kor_search
+        docker cp . ${{ steps.get_container_id.outputs.container_id }}:/usr/src/kor_search
 
     - name: Build and install extension in container
       run: |
         docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "cd /usr/src/kor_search && make && make install"
 
-    - name: Setup PostgreSQL extension
+    - name: Setup kor_search extension
       env:
         PGPASSWORD: postgres
       run: |
