@@ -25,18 +25,23 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        # Wait for Postgres to be ready before running the tests
-        timeout: 60s
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
     - uses: actions/checkout@v2
 
     - name: Set up PostgreSQL client
       run: sudo apt-get install -y postgresql-client
+
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for database to be ready...";
+          sleep 1;
+        done;
 
     - name: Build and install extension
       run: |
@@ -46,8 +51,8 @@ jobs:
     - name: Run tests
       run: |
         psql -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
-        # °¢ ÇÔ¼ö¿¡ ´ëÇÑ Å×½ºÆ® Äõ¸®¸¦ ½ÇÇàÇÕ´Ï´Ù.
-        psql -U postgres -d testdb -c "SELECT kor_search_like('³ª´Â ¹äÀ» ¸Ô¾ú´Ù', '¹ä');"
-        psql -U postgres -d testdb -c "SELECT kor_search_similar('I eat rice', '¹ä ¸Ô´Ù');"
-        psql -U postgres -d testdb -c "SELECT kor_search_tsvector('I eat rice', '¹ä ¸Ô´Ù');"
-        psql -U postgres -d testdb -c "SELECT kor_search_regex('I have 2 apples', '[0-9]+ »ç°ú');"
+        # ê° í•¨ìˆ˜ì— ëŒ€í•œ í…ŒìŠ¤íŠ¸ ì¿¼ë¦¬ë¥¼ ì‹¤í–‰í•©ë‹ˆë‹¤.
+        psql -U postgres -d testdb -c "SELECT kor_search_like('ë‚˜ëŠ” ë°¥ì„ ë¨¹ì—ˆë‹¤', 'ë°¥');"
+        psql -U postgres -d testdb -c "SELECT kor_search_similar('I eat rice', 'ë°¥ ë¨¹ë‹¤');"
+        psql -U postgres -d testdb -c "SELECT kor_search_tsvector('I eat rice', 'ë°¥ ë¨¹ë‹¤');"
+        psql -U postgres -d testdb -c "SELECT kor_search_regex('I have 2 apples', '[0-9]+ ì‚¬ê³¼');"
