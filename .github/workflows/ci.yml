@@ -44,6 +44,15 @@ jobs:
       run: |
         make
         sudo make install
+        sudo ldconfig  # 확장 설치 후 라이브러리 경로 재설정
+
+    - name: Ensure extension files are in place
+      run: |
+        ls -l /usr/share/postgresql/16/extension/kor_search.control
+        ls -l /usr/lib/postgresql/16/lib/kor_search.so
+
+    - name: Restart PostgreSQL service
+      run: sudo service postgresql restart
 
     - name: Set up database for testing
       env:
