@@ -68,6 +68,11 @@ jobs:
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
         docker cp test/test_cases.sql $CONTAINER_ID:/usr/src/kor_search/test/test_cases.sql
 
+    - name: Verify test file in container
+      run: |
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        docker exec $CONTAINER_ID bash -c "ls -l /usr/src/kor_search/test/"
+
     - name: Run SQL Tests
       env:
         PGPASSWORD: postgres
