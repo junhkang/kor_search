@@ -5,9 +5,9 @@
 #include "catalog/pg_type.h"
 #include "executor/spi.h"
 #include "commands/trigger.h"
+#include <math.h>
 #include <string.h>
 #include <ctype.h>
-#include <regex.h>
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
@@ -69,6 +69,47 @@ static void tokenize_text(const char *input, char tokens[MAX_WORDS][MAX_WORD_LEN
     }
 }
 
+// LIKE 검색 함수
+Datum
+kor_search_like(PG_FUNCTION_ARGS)
+{
+    text *input_text = PG_GETARG_TEXT_PP(0);
+    text *search_text = PG_GETARG_TEXT_PP(1);
+    bool result = false;
+
+    char *input = text_to_cstring(input_text);
+    char *search = text_to_cstring(search_text);
+
+    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
+    int token_count_search;
+
+    // 불용어를 제거하고 텍스트를 토큰화
+    tokenize_text(search, tokens_search, &token_count_search, isalpha(search[0]) ? stopwords_english : stopwords_korean);
+
+    // 각 토큰에 대해 단어집에서 유사 단어 검색 후, 입력 텍스트와 비교
+    for (int i = 0; i < token_count_search; i++) {
+        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
+        int similar_count;
+        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
+
+        bool token_found = false;
+
+        // 유사 단어가 입력 텍스트에 포함되어 있는지 확인
+        for (int k = 0; k < similar_count; k++) {
+            if (strstr(input, similar_tokens[k]) != NULL) {
+                token_found = true;
+                break;
+            }
+        }
+
+        if (!token_found) {
+            PG_RETURN_BOOL(false);
+        }
+    }
+
+    PG_RETURN_BOOL(true);
+}
+
 // 단어 변환 테이블에서 유사 검색하여 관련 단어를 가져옴
 static void similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count) {
     char query[8192];
@@ -104,37 +145,6 @@ static void similar_search_words(const char *token, char similar_tokens[MAX_WORD
     }
 
     SPI_finish();
-}
-
-// LIKE 검색 함수
-Datum
-kor_search_like(PG_FUNCTION_ARGS)
-{
-    text *input_text = PG_GETARG_TEXT_PP(0);
-    text *search_text = PG_GETARG_TEXT_PP(1);
-    bool result = false;
-
-    char *input = text_to_cstring(input_text);
-    char *search = text_to_cstring(search_text);
-
-    // 입력 텍스트에서 검색 텍스트가 존재하는지 확인
-    if (strstr(input, search) != NULL) {
-        result = true;
-    } else {
-        // 검색 텍스트를 단어집에서 유사한 단어로 변환하여 다시 검색
-        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-        int similar_count;
-        similar_search_words(search, similar_tokens, &similar_count);
-
-        for (int k = 0; k < similar_count; k++) {
-            if (strstr(input, similar_tokens[k]) != NULL) {
-                result = true;
-                break;
-            }
-        }
-    }
-
-    PG_RETURN_BOOL(result);
 }
 
 // 유사성 기반 검색 (비교 텍스트의 토큰이 입력 텍스트에 유사하게 포함되는지 검사)
@@ -201,37 +211,23 @@ kor_search_tsvector(PG_FUNCTION_ARGS)
 
     char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
     int token_count_search;
+    char tsquery[8192] = "";
+    char query[8192];
 
-    // 검색어 텍스트를 토큰화 (공백 기준으로 분리)
+    // 불용어를 제거하고 텍스트를 토큰화
     tokenize_text(search, tokens_search, &token_count_search, isalpha(search[0]) ? stopwords_english : stopwords_korean);
 
-    char tsquery[8192] = "";
-
-    // 각 토큰에 대해 유사 단어를 찾고 tsquery 생성
     for (int i = 0; i < token_count_search; i++) {
         char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
         int similar_count;
         similar_search_words(tokens_search[i], similar_tokens, &similar_count);
 
-        // 유사 단어가 없으면 해당 토큰 자체를 tsquery에 추가
-        if (similar_count == 0) {
-            strncpy(similar_tokens[0], tokens_search[i], MAX_WORD_LENGTH);
-            similar_tokens[0][MAX_WORD_LENGTH - 1] = '\0';
-            similar_count = 1;
-        }
-
-        if (i > 0 && strlen(tsquery) > 0) {
-            strcat(tsquery, " & ");  // AND 연산자로 연결 (모든 토큰이 포함되어야 하므로)
-        }
-
-        strcat(tsquery, "(");
-        for (int j = 0; j < similar_count; j++) {
-            if (j > 0) {
-                strcat(tsquery, " | ");  // OR 연산자로 유사 단어들 연결
+        for (int k = 0; k < similar_count; k++) {
+            if (strlen(tsquery) > 0) {
+                strncat(tsquery, " & ", sizeof(tsquery) - strlen(tsquery) - 1);
             }
-            strcat(tsquery, similar_tokens[j]);
+            strncat(tsquery, similar_tokens[k], sizeof(tsquery) - strlen(tsquery) - 1);
         }
-        strcat(tsquery, ")");
     }
 
     // tsquery가 비어있으면 false 반환
@@ -239,107 +235,70 @@ kor_search_tsvector(PG_FUNCTION_ARGS)
         PG_RETURN_BOOL(false);
     }
 
-    // tsvector 쿼리를 통해 검색 수행
-    char query[8192];
+    // TSVECTOR 쿼리 생성
     snprintf(query, sizeof(query),
              "SELECT to_tsvector('english', '%s') @@ to_tsquery('english', '%s');",
              input, tsquery);
 
-    elog(INFO, "Generated query: %s", query);  // 쿼리 출력
-
+    // 쿼리 실행
     SPI_connect();
     int ret = SPI_execute(query, true, 0);
     if (ret > 0 && SPI_processed > 0) {
-        result = (strcmp(SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1), "t") == 0);
+        bool tsvector_result = (strcmp(SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1), "t") == 0);
+        result = tsvector_result;
     }
     SPI_finish();
 
     PG_RETURN_BOOL(result);
 }
 
+// 정규식 검색 함수
 Datum
 kor_search_regex(PG_FUNCTION_ARGS)
 {
     text *input_text = PG_GETARG_TEXT_PP(0);
-    text *pattern_text = PG_GETARG_TEXT_PP(1);
+    text *pattern = PG_GETARG_TEXT_PP(1);
     bool result = false;
 
-    char *input = text_to_cstring(input_text);
-    char *pattern = text_to_cstring(pattern_text);
-
-    // 정규식에서 단어 부분만 추출
-    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
-    int token_count_search = 0;
-
-    const char *delimiters = "[]()+*?.|\\^$ ";
-    char *pattern_copy = strdup(pattern); // 패턴을 복사하여 사용
-    char *token = strtok(pattern_copy, delimiters);
-    while (token != NULL && token_count_search < MAX_WORDS) {
-        strncpy(tokens_search[token_count_search], token, MAX_WORD_LENGTH);
-        tokens_search[token_count_search][MAX_WORD_LENGTH - 1] = '\0';
-        token_count_search++;
-        token = strtok(NULL, delimiters);
-    }
-
-    // 확장된 정규식 생성
     char expanded_pattern[8192] = "";
-    const char *pattern_ptr = pattern;
+    char *input = text_to_cstring(input_text);
+    char *regex_pattern = text_to_cstring(pattern);
+    regex_t regex;
+
+    // 패턴을 토큰화하여 단어집을 적용
+    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
+    int token_count_search;
+
+    tokenize_text(regex_pattern, tokens_search, &token_count_search, isalpha(regex_pattern[0]) ? stopwords_english : stopwords_korean);
 
     for (int i = 0; i < token_count_search; i++) {
-        // 패턴에서 현재 토큰을 찾음
-        char *pos = strstr(pattern_ptr, tokens_search[i]);
-        if (pos != NULL) {
-            // 패턴의 앞부분을 복사
-            strncat(expanded_pattern, pattern_ptr, pos - pattern_ptr);
+        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
+        int similar_count;
+        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
 
-            // 유사 단어를 찾고 확장된 패턴을 생성
-            char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-            int similar_count;
-            similar_search_words(tokens_search[i], similar_tokens, &similar_count);
-
-            if (similar_count > 0) {
-                strcat(expanded_pattern, "(");
-                for (int j = 0; j < similar_count; j++) {
-                    if (j > 0) {
-                        strcat(expanded_pattern, "|");
-                    }
-                    strcat(expanded_pattern, similar_tokens[j]);
-                }
-                strcat(expanded_pattern, ")");
-            } else {
-                strcat(expanded_pattern, tokens_search[i]);
+        for (int k = 0; k < similar_count; k++) {
+            if (strlen(expanded_pattern) > 0) {
+                strncat(expanded_pattern, ".*", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
             }
-
-            // 패턴의 남은 부분으로 이동
-            pattern_ptr = pos + strlen(tokens_search[i]);
+            strncat(expanded_pattern, similar_tokens[k], sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
         }
     }
 
-    // 남은 패턴 부분을 추가
-    strcat(expanded_pattern, pattern_ptr);
+    // 확장된 패턴이 없으면 원래 패턴 사용
+    if (strlen(expanded_pattern) == 0) {
+        strncpy(expanded_pattern, regex_pattern, sizeof(expanded_pattern) - 1);
+    }
 
-    free(pattern_copy);  // 복사한 패턴 메모리 해제
-
-    elog(INFO, "Generated expanded pattern: %s", expanded_pattern);
-
-    // 정규식 컴파일
-    regex_t regex;
-    int ret = regcomp(&regex, expanded_pattern, REG_EXTENDED);
+    int ret = regcomp(&regex, expanded_pattern, REG_EXTENDED | REG_NOSUB);
     if (ret) {
-        ereport(ERROR, (errmsg("Could not compile regex: %s", expanded_pattern)));
+        elog(ERROR, "Could not compile regex: %s", expanded_pattern);
     }
 
-    // 입력 텍스트에 정규식이 매칭되는지 확인
-    ret = regexec(&regex, input, 0, NULL, 0);
-    if (!ret) {
-        result = true;  // 매칭됨
-    } else if (ret == REG_NOMATCH) {
-        result = false;  // 매칭되지 않음
-    } else {
-        ereport(ERROR, (errmsg("Regex match failed")));
+    // 정규식 매칭 검사
+    if (regexec(&regex, input, 0, NULL, 0) == 0) {
+        result = true;
     }
 
-    regfree(&regex);  // 정규식 메모리 해제
-
+    regfree(&regex);
     PG_RETURN_BOOL(result);
 }
