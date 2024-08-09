@@ -47,6 +47,14 @@ jobs:
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
         docker exec $CONTAINER_ID bash -c "cd /usr/src/kor_search && make && make install"
 
+    - name: Install pg_trgm extension
+      env:
+        PGPASSWORD: postgres
+      run: |
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+        psql -h $CONTAINER_IP -U postgres -d testdb -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
     - name: Setup kor_search extension
       env:
         PGPASSWORD: postgres
