@@ -15,7 +15,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Set up PostgreSQL
-      uses: Harmon758/postgresql-action@v1.2.0
+      uses: postgres-men/setup-postgresql@v1
       with:
         postgresql version: '16'
         postgresql db: 'testdb'
