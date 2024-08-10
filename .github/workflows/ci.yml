@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build-and-test:
@@ -32,38 +29,27 @@ jobs:
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y make gcc libpq-dev
 
-    - name: Get PostgreSQL container ID
-      id: get_container_id
-      run: |
-        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
-        echo "::set-output name=container_id::$CONTAINER_ID"
-
-    - name: Install pg_trgm extension
-      env:
-        PGPASSWORD: postgres
-      run: |
-        docker exec ${{ steps.get_container_id.outputs.container_id }} bash -c "psql -U postgres -d testdb -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
-
     - name: Install PostgreSQL dev libraries in container
       run: |
-        docker exec ${{ steps.get_container_id.outputs.container_id }} bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
+        docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "apt-get update && apt-get install -y postgresql-server-dev-16 make gcc"
 
     - name: Copy source code to container
       run: |
-        docker cp . ${{ steps.get_container_id.outputs.container_id }}:/usr/src/kor_search
+        docker cp . $(docker ps -q -f ancestor=postgres:16):/usr/src/kor_search
 
     - name: Build and install extension in container
       run: |
-        docker exec ${{ steps.get_container_id.outputs.container_id }} bash -c "cd /usr/src/kor_search && make && make install"
+        docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "cd /usr/src/kor_search && make && make install"
 
     - name: Setup kor_search extension
       env:
         PGPASSWORD: postgres
       run: |
-        docker exec ${{ steps.get_container_id.outputs.container_id }} bash -c "psql -U postgres -d testdb -c 'CREATE EXTENSION kor_search;'"
+        psql -v ON_ERROR_STOP=1 -h $(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q -f ancestor=postgres:16)) -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run SQL Tests
       env:
         PGPASSWORD: postgres
       run: |
-        docker exec ${{ steps.get_container_id.outputs.container_id }} bash -c "psql -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql"
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        docker exec $CONTAINER_ID bash -c "psql -v ON_ERROR_STOP=1 -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql"
