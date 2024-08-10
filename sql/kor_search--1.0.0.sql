@@ -207,7 +207,7 @@ VALUES
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'seven'), '일곱'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'eight'), '여덟'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'nine'), '아홉'),
-((SELECT id FROM kor_search_word_transform WHERE keyword = 'ten'), '열');
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'ten'), '열'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'lunch'), '점심');
 
 CREATE FUNCTION kor_search_like(input_text text, search_text text)
