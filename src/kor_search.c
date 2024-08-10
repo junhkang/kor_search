@@ -27,7 +27,7 @@ const char *stopwords_korean[] = {"는", "은", "이", "가", "을", "를", "에
 const char *stopwords_english[] = {"am", "is", "are", "was", "were", "be", "been", "being", NULL};
 
 // 함수 선언
-static void similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count);
+static bool similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count);
 
 // 단어를 공백으로 토큰화하고 불용어를 처리
 static void tokenize_text(const char *input, char tokens[MAX_WORDS][MAX_WORD_LENGTH], int *token_count, const char **stopwords) {
@@ -40,30 +40,36 @@ static void tokenize_text(const char *input, char tokens[MAX_WORDS][MAX_WORD_LEN
 
     while (token != NULL && *token_count < MAX_WORDS) {
         bool is_stopword = false;
+        bool is_keyword_in_dict = false;
 
-        // 한국어: 불용어가 단어 끝에 있는 경우 제거
-        if (!isalpha(token[0])) {
-            size_t token_len = strlen(token);
-            for (int i = 0; stopwords[i] != NULL; i++) {
-                size_t stopword_len = strlen(stopwords[i]);
-                if (token_len > stopword_len && strcmp(token + token_len - stopword_len, stopwords[i]) == 0) {
-                    token[token_len - stopword_len] = '\0';
-                    break;
+        // 단어집에서 유사 단어를 찾으며, 해당 단어가 단어집에 있는지 확인
+        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
+        int similar_count = 0;
+        is_keyword_in_dict = similar_search_words(token, similar_tokens, &similar_count);
+
+        // 불용어 처리 (단어집에 없을 때만 불용어로 처리)
+        if (!is_keyword_in_dict) {
+            if (!isalpha(token[0])) {
+                size_t token_len = strlen(token);
+                for (int i = 0; stopwords[i] != NULL; i++) {
+                    size_t stopword_len = strlen(stopwords[i]);
+                    if (token_len > stopword_len && strcmp(token + token_len - stopword_len, stopwords[i]) == 0) {
+                        token[token_len - stopword_len] = '\0';
+                        break;
+                    }
                 }
-            }
-        }
-        // 영어: 불용어가 단독으로 사용된 경우만 제거
-        else {
-            for (int i = 0; stopwords[i] != NULL; i++) {
-                if (strcmp(token, stopwords[i]) == 0) {
-                    is_stopword = true;
-                    break;
+            } else {
+                for (int i = 0; stopwords[i] != NULL; i++) {
+                    if (strcmp(token, stopwords[i]) == 0) {
+                        is_stopword = true;
+                        break;
+                    }
                 }
             }
         }
 
         // 불용어가 아니라면 토큰을 추가
-        if (!is_stopword || !isalpha(token[0])) {
+        if (!is_stopword || is_keyword_in_dict) {
             strncpy(tokens[*token_count], token, MAX_WORD_LENGTH);
             tokens[*token_count][MAX_WORD_LENGTH - 1] = '\0'; // Ensure null termination
             (*token_count)++;
@@ -72,8 +78,6 @@ static void tokenize_text(const char *input, char tokens[MAX_WORDS][MAX_WORD_LEN
         token = strtok(NULL, " ");
     }
 }
-
-#include <ctype.h>
 
 void to_lowercase(char *str) {
     for (; *str; ++str) {
@@ -133,12 +137,10 @@ kor_search_like(PG_FUNCTION_ARGS)
     PG_RETURN_BOOL(true);
 }
 
-
-
-// 단어 변환 테이블에서 유사 검색하여 관련 단어를 가져옴
-static void similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count) {
+static bool similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count) {
     char query[8192];
     int ret, proc;
+    bool is_in_dictionary = false;
 
     // 단어집에서 유사한 단어와 동의어를 검색하고 자기 자신을 포함하는 쿼리
     snprintf(query, sizeof(query),
@@ -153,6 +155,7 @@ static void similar_search_words(const char *token, char similar_tokens[MAX_WORD
 
     *similar_count = 0;
     if (ret > 0 && SPI_tuptable != NULL) {
+        is_in_dictionary = (proc > 0); // 단어가 단어집에 존재하는지 확인
         for (uint64 i = 0; i < proc; i++) {
             char *keyword = SPI_getvalue(SPI_tuptable->vals[i], SPI_tuptable->tupdesc, 1);
             char *synonym = SPI_getvalue(SPI_tuptable->vals[i], SPI_tuptable->tupdesc, 2);
@@ -170,6 +173,8 @@ static void similar_search_words(const char *token, char similar_tokens[MAX_WORD
     }
 
     SPI_finish();
+
+    return is_in_dictionary;
 }
 
 // 유사성 기반 검색 (비교 텍스트의 토큰이 입력 텍스트에 유사하게 포함되는지 검사)
