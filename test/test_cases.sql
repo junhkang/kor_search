@@ -60,7 +60,7 @@ DO $$ BEGIN
 END IF;
 
     -- '학교'와 'I go to school'이 의미적으로 유사하지 않으므로 FALSE를 기대함
-    IF (SELECT kor_search_similar('I go to school', '학교')) THEN
+    IF NOT (SELECT kor_search_similar('I go to school', '학교')) THEN
         RAISE EXCEPTION 'kor_search_similar test failed for case 2';
 END IF;
 
