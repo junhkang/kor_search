@@ -38,7 +38,8 @@ VALUES
 ('might'), ('and'), ('or'), ('but'), ('because'), ('so'), ('if'), ('then'), ('when'), ('where'), ('who'),
 ('what'), ('which'), ('how'), ('why'), ('this'), ('that'), ('these'), ('those'), ('my'), ('your'),
 ('his'), ('her'), ('its'), ('our'), ('their'), ('mine'), ('yours'), ('hers'), ('ours'), ('theirs'),
-('one'), ('two'), ('three'), ('four'), ('five'), ('six'), ('seven'), ('eight'), ('nine'), ('ten'), ('lunch');
+('one'), ('two'), ('three'), ('four'), ('five'), ('six'), ('seven'), ('eight'), ('nine'), ('ten'), ('lunch'), ('university'),
+('study');
 
 -- 유사어 삽입
 INSERT INTO kor_search_word_synonyms (keyword_id, synonym)
@@ -208,7 +209,9 @@ VALUES
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'eight'), '여덟'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'nine'), '아홉'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'ten'), '열'),
-((SELECT id FROM kor_search_word_transform WHERE keyword = 'lunch'), '점심');
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'lunch'), '점심'),
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'university'), '대학'),
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'study'), '공부');
 
 CREATE FUNCTION kor_search_like(input_text text, search_text text)
 RETURNS boolean
