@@ -4,7 +4,9 @@ DO $$ BEGIN
     IF NOT (SELECT kor_search_like('나는 밥을 먹었다', '밥')) THEN
         RAISE EXCEPTION 'kor_search_like test failed for case 1';
 END IF;
-
+    result := kor_search_like('I eat rice', '밥');
+    RAISE NOTICE 'Result for kor_search_like(''I eat rice'', ''밥''): %', result;
+    
     -- '밥'이 실제로 'rice'와 매핑되므로 TRUE를 기대함
     IF NOT (SELECT kor_search_like('I eat rice', '밥')) THEN
         RAISE EXCEPTION 'kor_search_like test failed for case 2';
