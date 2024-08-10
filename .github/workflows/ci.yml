@@ -64,3 +64,16 @@ jobs:
       run: |
         CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
         docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -f /usr/src/kor_search/test/test_cases.sql"
+
+    - name: Verify Test Results
+      env:
+        PGPASSWORD: postgres
+      run: |
+        CONTAINER_ID=$(docker ps -q -f ancestor=postgres:16)
+        TEST_OUTPUT=$(docker exec $CONTAINER_ID bash -c "psql -U postgres -d testdb -t -A -c 'SELECT COUNT(*) FROM test_results WHERE passed = false;'")
+        if [ "$TEST_OUTPUT" -ne "0" ]; then
+          echo "Tests failed."
+          exit 1
+        else
+          echo "All tests passed."
+        fi
