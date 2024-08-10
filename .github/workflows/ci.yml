@@ -41,11 +41,17 @@ jobs:
       run: |
         docker exec $(docker ps -q -f ancestor=postgres:16) bash -c "cd /usr/src/kor_search && make && make install"
 
+    - name: Setup pg_trgm extension
+      env:
+        PGPASSWORD: postgres
+      run: |
+        psql -h $(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q -f ancestor=postgres:16)) -U postgres -d testdb -c "CREATE EXTENSION pg_trgm;"
+
     - name: Setup kor_search extension
       env:
         PGPASSWORD: postgres
       run: |
-        psql -v ON_ERROR_STOP=1 -h $(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q -f ancestor=postgres:16)) -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
+        psql -h $(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q -f ancestor=postgres:16)) -U postgres -d testdb -c "CREATE EXTENSION kor_search;"
 
     - name: Run SQL Tests
       env:
