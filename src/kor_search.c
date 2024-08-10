@@ -73,33 +73,52 @@ static void tokenize_text(const char *input, char tokens[MAX_WORDS][MAX_WORD_LEN
     }
 }
 
-// LIKE 검색 함수
+#include <ctype.h>
+
+void to_lowercase(char *str) {
+    for (; *str; ++str) {
+        *str = tolower(*str);
+    }
+}
+
 Datum
 kor_search_like(PG_FUNCTION_ARGS)
 {
     text *input_text = PG_GETARG_TEXT_PP(0);
     text *search_text = PG_GETARG_TEXT_PP(1);
-    bool result = false;
 
     char *input = text_to_cstring(input_text);
     char *search = text_to_cstring(search_text);
 
+    // 입력 텍스트와 검색어를 소문자로 변환
+    to_lowercase(input);
+    to_lowercase(search);
+
+    // 1. 검색어 자체가 입력 텍스트에 포함되어 있는지 확인
+    if (strstr(input, search) != NULL) {
+        PG_RETURN_BOOL(true);
+    }
+
     char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
     int token_count_search;
 
-    // 불용어를 제거하고 텍스트를 토큰화
+    // 검색어를 토큰화
     tokenize_text(search, tokens_search, &token_count_search, isalpha(search[0]) ? stopwords_english : stopwords_korean);
 
     // 각 토큰에 대해 단어집에서 유사 단어 검색 후, 입력 텍스트와 비교
     for (int i = 0; i < token_count_search; i++) {
         char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
         int similar_count;
+
+        // 유사 단어 찾기
         similar_search_words(tokens_search[i], similar_tokens, &similar_count);
 
         bool token_found = false;
 
         // 유사 단어가 입력 텍스트에 포함되어 있는지 확인
         for (int k = 0; k < similar_count; k++) {
+            // 유사 단어를 소문자로 변환 후 비교
+            to_lowercase(similar_tokens[k]);
             if (strstr(input, similar_tokens[k]) != NULL) {
                 token_found = true;
                 break;
@@ -113,6 +132,8 @@ kor_search_like(PG_FUNCTION_ARGS)
 
     PG_RETURN_BOOL(true);
 }
+
+
 
 // 단어 변환 테이블에서 유사 검색하여 관련 단어를 가져옴
 static void similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count) {
