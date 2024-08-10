@@ -1,9 +1,13 @@
 -- kor_search_like Tests
-DO $$ BEGIN
+DO $$ 
+DECLARE
+    result boolean;    
+BEGIN
     -- '밥'이라는 단어가 문장에 포함되어 있으므로 TRUE를 기대함
     IF NOT (SELECT kor_search_like('나는 밥을 먹었다', '밥')) THEN
         RAISE EXCEPTION 'kor_search_like test failed for case 1';
 END IF;
+
     result := kor_search_like('I eat rice', '밥');
     RAISE NOTICE 'Result for kor_search_like(''I eat rice'', ''밥''): %', result;
     
