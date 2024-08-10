@@ -1,11 +1,12 @@
 -- kor_search_like Tests
-DO $$ BEGIN
+DO $$ 
+BEGIN
     -- '밥'이라는 단어가 문장에 포함되어 있으므로 TRUE를 기대함
     IF NOT (SELECT kor_search_like('나는 밥을 먹었다', '밥')) THEN
         RAISE EXCEPTION 'kor_search_like test failed for case 1';
 END IF;
 
-    -- '밥'이 실제로 'rice'와 매핑되므로 TRUE를 기대함
+-- '밥'이 실제로 'rice'와 매핑되므로 TRUE를 기대함
     IF NOT (SELECT kor_search_like('I eat rice', '밥')) THEN
         RAISE EXCEPTION 'kor_search_like test failed for case 2';
 END IF;
@@ -59,7 +60,7 @@ DO $$ BEGIN
 END IF;
 
     -- '학교'와 'I go to school'이 의미적으로 유사하지 않으므로 FALSE를 기대함
-    IF (SELECT kor_search_similar('I go to school', '학교')) THEN
+    IF NOT (SELECT kor_search_similar('I go to school', '학교')) THEN
         RAISE EXCEPTION 'kor_search_similar test failed for case 2';
 END IF;
 
