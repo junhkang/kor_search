@@ -206,10 +206,11 @@ kor_search_similar(PG_FUNCTION_ARGS)
 
         bool token_similar = false;
 
-        // 유사 단어를 입력 텍스트의 각 토큰과 비교
+        // 유사 단어를 입력 텍스트와 비교하여 일치/포함 여부 확인
         for (int k = 0; k < similar_count; k++) {
             for (int j = 0; j < token_count_input; j++) {
-                if (strcmp(tokens_input[j], similar_tokens[k]) == 0) {
+                // 토큰이 유사 단어와 일치하거나, 입력 텍스트에 포함되어 있는지 확인
+                if (strcmp(tokens_input[j], similar_tokens[k]) == 0 || strstr(tokens_input[j], similar_tokens[k]) != NULL) {
                     token_similar = true;
                     break;
                 }
@@ -227,6 +228,7 @@ kor_search_similar(PG_FUNCTION_ARGS)
 
     PG_RETURN_BOOL(result);
 }
+
 
 // TSVECTOR 검색 함수
 Datum
