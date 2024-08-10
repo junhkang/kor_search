@@ -1,6 +1,6 @@
 -- kor_search_like Tests
 DO $$ BEGIN
-    IF NOT (SELECT kor_search_like('나는 밥을 먹었다', '밥')) THEN
+    IF NOT (SELECT kor_search_like('나는 밥을 먹었다', 'rice')) THEN
         RAISE EXCEPTION 'kor_search_like test failed for case 1';
     END IF;
 
