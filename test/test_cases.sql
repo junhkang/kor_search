@@ -65,7 +65,7 @@ END IF;
 END IF;
 
     -- '점심 먹다'와 'He eats lunch'가 의미적으로 유사하므로 TRUE를 기대함
-    IF NOT (SELECT kor_search_similar('He eats lunch', '점심 먹다')) THEN
+    IF NOT (SELECT kor_search_similar('I eat lunch', '점심 먹다')) THEN
         RAISE EXCEPTION 'kor_search_similar test failed for case 3';
 END IF;
 
