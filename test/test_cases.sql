@@ -70,7 +70,7 @@ END IF;
 END IF;
 
     -- '책 읽다'와 'She reads a book'이 의미적으로 유사하므로 TRUE를 기대함
-    IF NOT (SELECT kor_search_similar('She reads a book', '책 읽다')) THEN
+    IF NOT (SELECT kor_search_similar('I read a book', '책 읽다')) THEN
         RAISE EXCEPTION 'kor_search_similar test failed for case 4';
 END IF;
 
