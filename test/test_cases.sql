@@ -55,7 +55,7 @@ DO $$ BEGIN
         RAISE EXCEPTION 'kor_search_similar test failed for case 3';
     END IF;
 
-    IF NOT (SELECT kor_search_similar('She reads a book', '책 읽다')) THEN
+    IF NOT (SELECT kor_search_similar('She reads a book', 'ㅁㄴㅇㄹㅁㄴㅇㄹㄴㅁㅇㄹ')) THEN
         RAISE EXCEPTION 'kor_search_similar test failed for case 4';
     END IF;
 
