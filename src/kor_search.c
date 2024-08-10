@@ -23,7 +23,7 @@ PG_FUNCTION_INFO_V1(kor_search_regex);
 #define MAX_WORD_LENGTH 128
 
 // 불용어 리스트 정의
-const char *stopwords_korean[] = {"는", "은", "이", "가", "을", "를", "에", "에서", "와", "과", "도", "의", NULL};
+const char *stopwords_korean[] = {"는", "은", "이", "가", "을", "를", "에", "에서", "와", "과", "도", "의", "하다", NULL};
 const char *stopwords_english[] = {"am", "is", "are", "was", "were", "be", "been", "being", NULL};
 
 // 함수 선언
