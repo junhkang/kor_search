@@ -39,7 +39,7 @@ VALUES
 ('what'), ('which'), ('how'), ('why'), ('this'), ('that'), ('these'), ('those'), ('my'), ('your'),
 ('his'), ('her'), ('its'), ('our'), ('their'), ('mine'), ('yours'), ('hers'), ('ours'), ('theirs'),
 ('one'), ('two'), ('three'), ('four'), ('five'), ('six'), ('seven'), ('eight'), ('nine'), ('ten'), ('lunch'), ('university'),
-('study'), ('live'), ('computer');
+('study'), ('live'), ('computer'), ('travel'), ('football'), ('moon');
 
 -- 유사어 삽입
 INSERT INTO kor_search_word_synonyms (keyword_id, synonym)
@@ -97,7 +97,7 @@ VALUES
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'fish'), '생선'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'vegetable'), '야채'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'fruit'), '과일'),
-((SELECT id FROM kor_search_word_transform WHERE keyword = 'car'), '자동차'),
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'car'), '차'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'bus'), '버스'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'train'), '기차'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'airplane'), '비행기'),
@@ -208,7 +208,10 @@ VALUES
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'university'), '대학'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'study'), '공부'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'live'), '살다'),
-((SELECT id FROM kor_search_word_transform WHERE keyword = 'computer'), '컴퓨터');
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'computer'), '컴퓨터'),
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'travel'), '여행'),
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'football'), '축구'),
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'moon'), '달');
 
 CREATE FUNCTION kor_search_like(input_text text, search_text text)
 RETURNS boolean
