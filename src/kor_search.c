@@ -148,7 +148,6 @@ static bool similar_search_words(const char *token, char similar_tokens[MAX_WORD
              "JOIN kor_search_word_synonyms s ON k.id = s.keyword_id "
              "WHERE k.keyword = '%s' OR s.synonym = '%s'",
              token, token);
-
     SPI_connect();
     ret = SPI_execute(query, true, 0);
     proc = SPI_processed;
@@ -177,60 +176,54 @@ static bool similar_search_words(const char *token, char similar_tokens[MAX_WORD
     return is_in_dictionary;
 }
 
-// 유사성 기반 검색 (비교 텍스트의 토큰이 입력 텍스트에 유사하게 포함되는지 검사)
 Datum
 kor_search_similar(PG_FUNCTION_ARGS)
 {
     text *input_text = PG_GETARG_TEXT_PP(0);
     text *search_text = PG_GETARG_TEXT_PP(1);
-    bool result = false;
+    bool result = true;
 
     char *input = text_to_cstring(input_text);
     char *search = text_to_cstring(search_text);
 
-    char tokens_input[MAX_WORDS][MAX_WORD_LENGTH];
     char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
-    int token_count_input, token_count_search;
+    int token_count_search;
 
-    // 불용어를 제거하고 텍스트를 토큰화
-    tokenize_text(input, tokens_input, &token_count_input, isalpha(input[0]) ? stopwords_english : stopwords_korean);
+    // 입력 텍스트를 소문자로 변환
+    to_lowercase(input);
+
+    // 검색 텍스트(검색 문장)를 토큰화
     tokenize_text(search, tokens_search, &token_count_search, isalpha(search[0]) ? stopwords_english : stopwords_korean);
 
-    bool all_tokens_similar = true;
-
-    // 검색 텍스트의 각 토큰에 대해 유사 단어 검색
+    // 검색 텍스트(검색 단어)의 각 토큰에 대해 유사 단어 검색
     for (int i = 0; i < token_count_search; i++) {
         char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
         int similar_count;
         similar_search_words(tokens_search[i], similar_tokens, &similar_count);
 
-        bool token_similar = false;
+        bool token_found = false;
 
-        // 유사 단어를 입력 텍스트와 비교하여 일치/포함 여부 확인
+        // 유사 단어 중 하나라도 입력 텍스트에 포함되어 있는지 확인
         for (int k = 0; k < similar_count; k++) {
-            for (int j = 0; j < token_count_input; j++) {
-                // 토큰이 유사 단어와 일치하거나, 입력 텍스트에 포함되어 있는지 확인
-                if (strcmp(tokens_input[j], similar_tokens[k]) == 0 || strstr(tokens_input[j], similar_tokens[k]) != NULL) {
-                    token_similar = true;
-                    break;
-                }
+            // 유사 단어를 소문자로 변환 후 비교
+            to_lowercase(similar_tokens[k]);
+            if (strstr(input, similar_tokens[k]) != NULL) {
+                token_found = true;
+                break;
             }
-            if (token_similar) break;
         }
 
-        if (!token_similar) {
-            all_tokens_similar = false;
+        // 하나라도 매칭되지 않으면 false 반환
+        if (!token_found) {
+            result = false;
             break;
         }
     }
-
-    result = all_tokens_similar;
 
     PG_RETURN_BOOL(result);
 }
 
 
-// TSVECTOR 검색 함수
 Datum
 kor_search_tsvector(PG_FUNCTION_ARGS)
 {
@@ -254,23 +247,29 @@ kor_search_tsvector(PG_FUNCTION_ARGS)
         int similar_count;
         similar_search_words(tokens_search[i], similar_tokens, &similar_count);
 
+        // 유사 단어들을 "token1 | token2 | ..." 형태로 결합
+        char token_group[8192] = "";
         for (int k = 0; k < similar_count; k++) {
-            if (strlen(tsquery) > 0) {
-                strncat(tsquery, " & ", sizeof(tsquery) - strlen(tsquery) - 1);
+            if (strlen(token_group) > 0) {
+                strncat(token_group, " | ", sizeof(token_group) - strlen(token_group) - 1);
             }
-            strncat(tsquery, similar_tokens[k], sizeof(tsquery) - strlen(tsquery) - 1);
+            strncat(token_group, similar_tokens[k], sizeof(token_group) - strlen(token_group) - 1);
         }
+
+        // 여러 유사 단어 그룹을 "&" 연산자로 연결
+        if (strlen(tsquery) > 0) {
+            strncat(tsquery, " & ", sizeof(tsquery) - strlen(tsquery) - 1);
+        }
+        strncat(tsquery, token_group, sizeof(tsquery) - strlen(tsquery) - 1);
     }
 
-    // tsquery가 비어있으면 false 반환
     if (strlen(tsquery) == 0) {
         PG_RETURN_BOOL(false);
     }
 
-    // TSVECTOR 쿼리 생성
     snprintf(query, sizeof(query),
-             "SELECT to_tsvector('english', '%s') @@ to_tsquery('english', '%s');",
-             input, tsquery);
+             "SELECT (to_tsvector('english', '%s') || to_tsvector('simple', '%s')) @@ to_tsquery('simple', '%s');",
+             input, input, tsquery);
 
     // 쿼리 실행
     SPI_connect();
@@ -283,7 +282,6 @@ kor_search_tsvector(PG_FUNCTION_ARGS)
 
     PG_RETURN_BOOL(result);
 }
-
 // 정규식 검색 함수
 Datum
 kor_search_regex(PG_FUNCTION_ARGS)
@@ -301,18 +299,35 @@ kor_search_regex(PG_FUNCTION_ARGS)
     char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
     int token_count_search;
 
-    tokenize_text(regex_pattern, tokens_search, &token_count_search, isalpha(regex_pattern[0]) ? stopwords_english : stopwords_korean);
+    // 알파벳이나 한글이 아닌 패턴은 그대로 확장된 패턴에 추가
+    if (!isalpha(regex_pattern[0]) && regex_pattern[0] < 128) {
+        strncpy(expanded_pattern, regex_pattern, sizeof(expanded_pattern) - 1);
+    } else {
+        tokenize_text(regex_pattern, tokens_search, &token_count_search,
+                      isalpha(regex_pattern[0]) ? stopwords_english : stopwords_korean);
 
-    for (int i = 0; i < token_count_search; i++) {
-        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-        int similar_count;
-        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
+        for (int i = 0; i < token_count_search; i++) {
+            char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
+            int similar_count;
+            similar_search_words(tokens_search[i], similar_tokens, &similar_count);
 
-        for (int k = 0; k < similar_count; k++) {
-            if (strlen(expanded_pattern) > 0) {
-                strncat(expanded_pattern, ".*", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
+            // 단어가 변환된 경우 정규식 패턴에 포함
+            if (similar_count > 0) {
+                strncat(expanded_pattern, "(", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
+                for (int k = 0; k < similar_count; k++) {
+                    if (k > 0) {
+                        strncat(expanded_pattern, "|", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
+                    }
+                    strncat(expanded_pattern, similar_tokens[k], sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
+                }
+                strncat(expanded_pattern, ")", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
+            } else {
+                // 변환되지 않은 경우 원래 토큰 사용
+                if (strlen(expanded_pattern) > 0) {
+                    strncat(expanded_pattern, ".*", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
+                }
+                strncat(expanded_pattern, tokens_search[i], sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
             }
-            strncat(expanded_pattern, similar_tokens[k], sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
         }
     }
 
@@ -321,6 +336,7 @@ kor_search_regex(PG_FUNCTION_ARGS)
         strncpy(expanded_pattern, regex_pattern, sizeof(expanded_pattern) - 1);
     }
 
+    // 정규식 컴파일 및 매칭 검사
     int ret = regcomp(&regex, expanded_pattern, REG_EXTENDED | REG_NOSUB);
     if (ret) {
         elog(ERROR, "Could not compile regex: %s", expanded_pattern);

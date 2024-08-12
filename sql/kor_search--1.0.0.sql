@@ -39,7 +39,7 @@ VALUES
 ('what'), ('which'), ('how'), ('why'), ('this'), ('that'), ('these'), ('those'), ('my'), ('your'),
 ('his'), ('her'), ('its'), ('our'), ('their'), ('mine'), ('yours'), ('hers'), ('ours'), ('theirs'),
 ('one'), ('two'), ('three'), ('four'), ('five'), ('six'), ('seven'), ('eight'), ('nine'), ('ten'), ('lunch'), ('university'),
-('study'), ('live');
+('study'), ('live'), ('computer');
 
 -- 유사어 삽입
 INSERT INTO kor_search_word_synonyms (keyword_id, synonym)
@@ -212,7 +212,8 @@ VALUES
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'lunch'), '점심'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'university'), '대학'),
 ((SELECT id FROM kor_search_word_transform WHERE keyword = 'study'), '공부'),
-((SELECT id FROM kor_search_word_transform WHERE keyword = 'live'), '살다');
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'live'), '살다'),
+((SELECT id FROM kor_search_word_transform WHERE keyword = 'computer'), '컴퓨터');
 
 CREATE FUNCTION kor_search_like(input_text text, search_text text)
 RETURNS boolean
