@@ -198,10 +198,11 @@ kor_search_similar(PG_FUNCTION_ARGS)
     // 검색 텍스트(검색 단어)의 각 토큰에 대해 유사 단어 검색
     for (int i = 0; i < token_count_search; i++) {
         char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-        int similar_count;
-        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
-
+        int similar_count = 0;
         bool token_found = false;
+
+        // 유사 단어 검색
+        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
 
         // 유사 단어 중 하나라도 입력 텍스트에 포함되어 있는지 확인
         for (int k = 0; k < similar_count; k++) {
@@ -222,6 +223,7 @@ kor_search_similar(PG_FUNCTION_ARGS)
 
     PG_RETURN_BOOL(result);
 }
+
 
 
 Datum
