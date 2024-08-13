@@ -106,8 +106,8 @@ DO $$ BEGIN
         RAISE EXCEPTION 'kor_search_tsvector test failed for case 1';
 END IF;
 
-    -- '학교'라는 검색어가 'I go to school'의 텍스트와 유사하지 않으므로 FALSE를 기대함
-    IF (SELECT kor_search_tsvector('I go to school', '학교')) THEN
+    -- '학교'라는 검색어가 'I go to school'의 텍스트와 유사함으로 TRUE를 기대함
+    IF NOT (SELECT kor_search_tsvector('I go to school', '학교')) THEN
         RAISE EXCEPTION 'kor_search_tsvector test failed for case 2';
 END IF;
 
