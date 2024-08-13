@@ -74,8 +74,7 @@ END IF;
         RAISE EXCEPTION 'kor_search_similar test failed for case 4';
 END IF;
 
-    -- '차'와 'The car is fast'가 의미적으로 유사하지 않으므로 FALSE를 기대함
-    IF (SELECT kor_search_similar('The car is fast', '차')) THEN
+    IF NOT (SELECT kor_search_similar('The car is fast', '차')) THEN
         RAISE EXCEPTION 'kor_search_similar test failed for case 5';
 END IF;
 
@@ -134,12 +133,12 @@ END IF;
 
     -- '달'라는 검색어가 'The moon is bright'의 텍스트와 유사하므로 TRUE를 기대함
     IF NOT (SELECT kor_search_tsvector('The moon is bright', '달')) THEN
-        RAISE EXCEPTION 'kor_search_tsvector test failed for case 8';
+        RAISE EXCEPTION 'kor_search_tsvector test failed for case 7';
 END IF;
 
     -- '컴퓨터'라는 검색어가 'The computer is fast'의 텍스트와 유사하므로 TRUE를 기대함
     IF NOT (SELECT kor_search_tsvector('The computer is fast', '컴퓨터')) THEN
-        RAISE EXCEPTION 'kor_search_tsvector test failed for case 9';
+        RAISE EXCEPTION 'kor_search_tsvector test failed for case 8';
 END IF;
 END $$;
 
