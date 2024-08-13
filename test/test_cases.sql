@@ -193,4 +193,4 @@ END $$;
 --     IF NOT (SELECT kor_search_regex('The book has 200 pages', '[0-9]+ 페이지')) THEN
 --         RAISE EXCEPTION 'kor_search_regex test failed for case 10';
 -- END IF;
-END $$;
+-- END $$;
