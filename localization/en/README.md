@@ -2,6 +2,7 @@
   <a href="/"><img src="https://upload.wikimedia.org/wikipedia/commons/0/09/Flag_of_South_Korea.svg" width="30"></a>
   <a href="#"><img src="https://upload.wikimedia.org/wikipedia/en/a/a4/Flag_of_the_United_States.svg" width="30"></a>
 </p>
+
 # kor_search
 
 Korean text search extension for PostgreSQL.
@@ -19,7 +20,7 @@ Korean text search extension for PostgreSQL.
 
 ### Flexible Custom Search
 
-`kor_search` allows you to modify internal table data to provide search tailored to specific industries or fields. For example, in the case of »ê¾÷ÀÇ ¿ª±º, the extension has been customized for searches related to construction by applying a large amount of construction-related data.
+`kor_search` allows you to modify internal table data to provide search tailored to specific industries or fields. For example, in the case of ì‚°ì—…ì˜ ì—­êµ°, the extension has been customized for searches related to construction by applying a large amount of construction-related data.
 
 ### Performance Considerations
 
@@ -64,14 +65,14 @@ Performance analysis is essential when querying large amounts of data, as search
 1. Sentence Similarity Check:
 
     ```sql
-    -- '¹ä ¸Ô´Ù' is semantically similar to 'I eat rice', so TRUE is expected
-    SELECT kor_search_similar('I eat rice', '¹ä ¸Ô´Ù');  -- Result: true
+    -- 'ë°¥ ë¨¹ë‹¤' is semantically similar to 'I eat rice', so TRUE is expected
+    SELECT kor_search_similar('I eat rice', 'ë°¥ ë¨¹ë‹¤');  -- Result: true
 
-    -- '¼­¿ï »ì´Ù' is semantically similar to 'She lives in Seoul', so TRUE is expected
-    SELECT kor_search_similar('She lives in Seoul', '¼­¿ï »ì´Ù');  -- Result: true
+    -- 'ì„œìš¸ ì‚´ë‹¤' is semantically similar to 'She lives in Seoul', so TRUE is expected
+    SELECT kor_search_similar('She lives in Seoul', 'ì„œìš¸ ì‚´ë‹¤');  -- Result: true
 
-    -- 'Â÷°¡ ºü¸£´Ù' is semantically similar to 'The car is fast', so TRUE is expected
-    SELECT kor_search_similar('The car is fast', 'Â÷°¡ ºü¸£´Ù');  -- Result: true
+    -- 'ì°¨ê°€ ë¹ ë¥´ë‹¤' is semantically similar to 'The car is fast', so TRUE is expected
+    SELECT kor_search_similar('The car is fast', 'ì°¨ê°€ ë¹ ë¥´ë‹¤');  -- Result: true
     ```
 
 ### kor_like
@@ -83,14 +84,14 @@ Performance analysis is essential when querying large amounts of data, as search
 1. Word Inclusion Check:
 
     ```sql
-    -- Search for 'lg' keyword with '¿¤Áö', '¾ÙÁö'
-    SELECT kor_like('ÀÌ°ÍÀº ¿¤Áö Á¦Ç°ÀÔ´Ï´Ù', 'lg');  -- Result: true
-    SELECT kor_like('ÀÌ°ÍÀº LG Á¦Ç°ÀÔ´Ï´Ù', '¿¤Áö');  -- Result: true
+    -- Search for 'lg' keyword with 'ì—˜ì§€', 'ì•¨ì§€'
+    SELECT kor_like('ì´ê²ƒì€ ì—˜ì§€ ì œí’ˆì…ë‹ˆë‹¤', 'lg');  -- Result: true
+    SELECT kor_like('ì´ê²ƒì€ LG ì œí’ˆì…ë‹ˆë‹¤', 'ì—˜ì§€');  -- Result: true
 
-    -- Search for 'apple' keyword with '¾ÖÇÃ', '»ç°ú'
-    SELECT kor_like('¾ÖÇÃÀº ÈÇ¸¢ÇÑ °úÀÏÀÔ´Ï´Ù', 'apple');  -- Result: true
-    SELECT kor_like('»ç°ú¸¦ ÁÁ¾ÆÇÕ´Ï´Ù', 'apple');  -- Result: true
-    SELECT kor_like('AppleÀº °úÀÏÀÔ´Ï´Ù', '»ç°ú');  -- Result: true
+    -- Search for 'apple' keyword with 'ì• í”Œ', 'ì‚¬ê³¼'
+    SELECT kor_like('ì• í”Œì€ í›Œë¥­í•œ ê³¼ì¼ì…ë‹ˆë‹¤', 'apple');  -- Result: true
+    SELECT kor_like('ì‚¬ê³¼ë¥¼ ì¢‹ì•„í•©ë‹ˆë‹¤', 'apple');  -- Result: true
+    SELECT kor_like('Appleì€ ê³¼ì¼ì…ë‹ˆë‹¤', 'ì‚¬ê³¼');  -- Result: true
     ```
 
 ### kor_search_tsvector
@@ -102,15 +103,15 @@ Performance analysis is essential when querying large amounts of data, as search
 1. Search for Similar Words Using tsvector:
 
     ```sql
-    -- Search for 'data science' keyword with 'µ¥ÀÌÅÍ °úÇĞ', 'µ¥ÀÌÅÍ »çÀÌ¾ğ½º'
-    SELECT kor_search_tsvector('µ¥ÀÌÅÍ °úÇĞÀº ¹Ì·¡ÀÇ À¯¸ÁÇÑ ºĞ¾ßÀÔ´Ï´Ù', 'data science');  -- Result: true
-    SELECT kor_search_tsvector('µ¥ÀÌÅÍ »çÀÌ¾ğ½º´Â ¸¹Àº °¡´É¼ºÀ» Á¦°øÇÕ´Ï´Ù', 'data science');  -- Result: true
-    SELECT kor_search_tsvector('Data Science´Â ¸¹Àº °¡´É¼ºÀ» Á¦°øÇÕ´Ï´Ù', 'µ¥ÀÌÅÍ °úÇĞ');  -- Result: true
+    -- Search for 'data science' keyword with 'ë°ì´í„° ê³¼í•™', 'ë°ì´í„° ì‚¬ì´ì–¸ìŠ¤'
+    SELECT kor_search_tsvector('ë°ì´í„° ê³¼í•™ì€ ë¯¸ë˜ì˜ ìœ ë§í•œ ë¶„ì•¼ì…ë‹ˆë‹¤', 'data science');  -- Result: true
+    SELECT kor_search_tsvector('ë°ì´í„° ì‚¬ì´ì–¸ìŠ¤ëŠ” ë§ì€ ê°€ëŠ¥ì„±ì„ ì œê³µí•©ë‹ˆë‹¤', 'data science');  -- Result: true
+    SELECT kor_search_tsvector('Data ScienceëŠ” ë§ì€ ê°€ëŠ¥ì„±ì„ ì œê³µí•©ë‹ˆë‹¤', 'ë°ì´í„° ê³¼í•™');  -- Result: true
 
-    -- Search for 'machine learning' keyword with '¸Ó½Å·¯´×', '±â°èÇĞ½À'
-    SELECT kor_search_tsvector('¸Ó½Å·¯´× ±â¼úÀÌ ¹ßÀüÇÏ°í ÀÖ½À´Ï´Ù', 'machine learning');  -- Result: true
-    SELECT kor_search_tsvector('±â°èÇĞ½À ¾Ë°í¸®ÁòÀ» ¿¬±¸ÇÕ´Ï´Ù', 'machine learning');  -- Result: true
-    SELECT kor_search_tsvector('Machine Learning ¾Ë°í¸®ÁòÀ» ¿¬±¸ÇÕ´Ï´Ù', '±â°èÇĞ½À');  -- Result: true
+    -- Search for 'machine learning' keyword with 'ë¨¸ì‹ ëŸ¬ë‹', 'ê¸°ê³„í•™ìŠµ'
+    SELECT kor_search_tsvector('ë¨¸ì‹ ëŸ¬ë‹ ê¸°ìˆ ì´ ë°œì „í•˜ê³  ìˆìŠµë‹ˆë‹¤', 'machine learning');  -- Result: true
+    SELECT kor_search_tsvector('ê¸°ê³„í•™ìŠµ ì•Œê³ ë¦¬ì¦˜ì„ ì—°êµ¬í•©ë‹ˆë‹¤', 'machine learning');  -- Result: true
+    SELECT kor_search_tsvector('Machine Learning ì•Œê³ ë¦¬ì¦˜ì„ ì—°êµ¬í•©ë‹ˆë‹¤', 'ê¸°ê³„í•™ìŠµ');  -- Result: true
     ```
 
 ### kor_regex_search
@@ -123,14 +124,14 @@ Performance analysis is essential when querying large amounts of data, as search
 
     ```sql
     -- Search for specific word patterns using regex
-    SELECT kor_regex_search('ÀÚ¹Ù´Â °­·ÂÇÑ ¾ğ¾îÀÔ´Ï´Ù', 'ÀÚ¹Ù|ÆÄÀÌ½ã');  -- Result: true
-    SELECT kor_regex_search('ÆÄÀÌ½ãÀº ¹è¿ì±â ½¬¿î ¾ğ¾îÀÔ´Ï´Ù', 'ÀÚ¹Ù|ÆÄÀÌ½ã');  -- Result: true
-    SELECT kor_regex_search('JAVA¿Í PYTHONÀº ÀÎ±âÀÖ´Â ¾ğ¾îÀÔ´Ï´Ù', '(?i)ÀÚ¹Ù|ÆÄÀÌ½ã');  -- Result: true
+    SELECT kor_regex_search('ìë°”ëŠ” ê°•ë ¥í•œ ì–¸ì–´ì…ë‹ˆë‹¤', 'ìë°”|íŒŒì´ì¬');  -- Result: true
+    SELECT kor_regex_search('íŒŒì´ì¬ì€ ë°°ìš°ê¸° ì‰¬ìš´ ì–¸ì–´ì…ë‹ˆë‹¤', 'ìë°”|íŒŒì´ì¬');  -- Result: true
+    SELECT kor_regex_search('JAVAì™€ PYTHONì€ ì¸ê¸°ìˆëŠ” ì–¸ì–´ì…ë‹ˆë‹¤', '(?i)ìë°”|íŒŒì´ì¬');  -- Result: true
 
-    -- Search for 'big data' and '´ë¿ë·® µ¥ÀÌÅÍ' using regex
-    SELECT kor_regex_search('ºòµ¥ÀÌÅÍ ºĞ¼®ÀÌ Áß¿äÇÕ´Ï´Ù', 'ºòµ¥ÀÌÅÍ|´ë¿ë·® µ¥ÀÌÅÍ');  -- Result: true
-    SELECT kor_regex_search('´ë¿ë·® µ¥ÀÌÅÍ¸¦ Ã³¸®ÇÕ´Ï´Ù', 'ºòµ¥ÀÌÅÍ|´ë¿ë·® µ¥ÀÌÅÍ');  -- Result: true
-    SELECT kor_regex_search('Big Data´Â Çö´ë ±â¼úÀÇ ÇÙ½ÉÀÔ´Ï´Ù', '(?i)ºòµ¥ÀÌÅÍ|´ë¿ë·® µ¥ÀÌÅÍ');  -- Result: true
+    -- Search for 'big data' and 'ëŒ€ìš©ëŸ‰ ë°ì´í„°' using regex
+    SELECT kor_regex_search('ë¹…ë°ì´í„° ë¶„ì„ì´ ì¤‘ìš”í•©ë‹ˆë‹¤', 'ë¹…ë°ì´í„°|ëŒ€ìš©ëŸ‰ ë°ì´í„°');  -- Result: true
+    SELECT kor_regex_search('ëŒ€ìš©ëŸ‰ ë°ì´í„°ë¥¼ ì²˜ë¦¬í•©ë‹ˆë‹¤', 'ë¹…ë°ì´í„°|ëŒ€ìš©ëŸ‰ ë°ì´í„°');  -- Result: true
+    SELECT kor_regex_search('Big DataëŠ” í˜„ëŒ€ ê¸°ìˆ ì˜ í•µì‹¬ì…ë‹ˆë‹¤', '(?i)ë¹…ë°ì´í„°|ëŒ€ìš©ëŸ‰ ë°ì´í„°');  -- Result: true
     ```
 
 ## Managing the Word Conversion Table
@@ -142,7 +143,7 @@ INSERT INTO kor_search_word_transform (keyword)
 VALUES ('apple');
 
 INSERT INTO kor_search_word_synonyms (keyword_id, synonym)
-VALUES ((SELECT id FROM kor_search_word_transform WHERE keyword = 'apple'), '¾ÖÇÃ');
+VALUES ((SELECT id FROM kor_search_word_transform WHERE keyword = 'apple'), 'ì• í”Œ');
 ```
 
 ## Uninstallation
