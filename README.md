@@ -2,7 +2,6 @@
   <a href="#"><img src="https://upload.wikimedia.org/wikipedia/commons/0/09/Flag_of_South_Korea.svg" width="30"></a>
    <a href="/localization/en/README.md"><img src="https://upload.wikimedia.org/wikipedia/en/a/a4/Flag_of_the_United_States.svg" width="30"></a>
 </p>
-
 # kor_search
 
 PostgreSQL용 한국어 텍스트 검색 확장.
@@ -33,6 +32,21 @@ PostgreSQL용 한국어 텍스트 검색 확장.
 단어집의 용량에 따라 대량 데이터를 조회할 때 성능 저하가 발생할 수 있으므로, 성능 분석이 필수적입니다. 또한, 외부 익스텐션 사용이 제한된 RDS 환경에서도 유사한 기능을 제공하는 함수들이 구현되어 있지만, 성능 면에서 본격적인 익스텐션만큼 뛰어나지는 않습니다.
 
 ## 설치
+
+### PGXN을 통한 설치
+
+1. `kor_search`는 [PGXN(PostgreSQL Extension Network)](https://pgxn.org/)에 공식 등록된 확장입니다. PGXN을 통해 간단한 명령어로 확장을 설치할 수 있습니다:
+
+```sh
+pgxn install kor_search
+```
+
+2. 그런 다음, PostgreSQL 데이터베이스에 접속하여 확장을 활성화합니다:
+
+    ```sh
+    psql -U your_username -d your_database
+    CREATE EXTENSION kor_search;
+    ```
 
 ### 로컬 PostgreSQL 또는 EC2에서
 
