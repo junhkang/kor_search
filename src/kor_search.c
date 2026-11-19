@@ -38,8 +38,8 @@ legacy_lookup_sql(FunctionCallInfo fcinfo)
     char *synonyms = quote_qualified_identifier(schema, "kor_search_word_synonyms");
 
     return psprintf("SELECT DISTINCT k.keyword, s.synonym FROM %s k "
-                    "JOIN %s s ON k.id = s.keyword_id "
-                    "WHERE k.keyword = $1 OR s.synonym = $1",
+                    "JOIN %s s ON k.id OPERATOR(pg_catalog.=) s.keyword_id "
+                    "WHERE k.keyword OPERATOR(pg_catalog.=) $1 OR s.synonym OPERATOR(pg_catalog.=) $1",
                     keywords, synonyms);
 }
 
