@@ -127,13 +127,11 @@ simple_phrase(Oid config, const char *term)
 }
 
 static Datum
-combine_query(PGFunction fn, Datum left, Datum right)
+or_phrase(Datum group, Datum phrase)
 {
-    if (!left || DatumGetTSQuery(right)->size == 0)
-        return (left && DatumGetTSQuery(left)->size > 0) ? left : right;
-    if (DatumGetTSQuery(left)->size == 0)
-        return right;
-    return DirectFunctionCall2(fn, left, right);
+    if (DatumGetTSQuery(phrase)->size == 0)
+        return group;
+    return group ? DirectFunctionCall2(tsquery_or, group, phrase) : phrase;
 }
 
 static void
@@ -161,7 +159,8 @@ legacy_match(FunctionCallInfo fcinfo, LegacyMode mode)
     SPIPlanPtr plan;
     MemoryContext caller = CurrentMemoryContext;
     StringInfoData regex = {0};
-    Datum tsquery = 0;
+    Datum simple_vec = 0;
+    Datum english_vec = 0;
     Oid simple = InvalidOid;
     Oid english = InvalidOid;
     bool matched = true;
@@ -198,7 +197,8 @@ legacy_match(FunctionCallInfo fcinfo, LegacyMode mode)
     {
         List *aliases = legacy_expand(plan, token);
         ListCell *entry;
-        Datum group = 0;
+        Datum simple_group = 0;
+        Datum english_group = 0;
         bool hit = false;
         bool first = true;
 
@@ -206,7 +206,6 @@ legacy_match(FunctionCallInfo fcinfo, LegacyMode mode)
             continue;
         if (mode == LEGACY_REGEX)
             appendStringInfoString(&regex, has_terms ? ".*(" : "(");
-        has_terms = true;
 
         foreach(entry, aliases)
         {
@@ -214,8 +213,8 @@ legacy_match(FunctionCallInfo fcinfo, LegacyMode mode)
 
             if (mode == LEGACY_FTS)
             {
-                group = combine_query(tsquery_or, group, simple_phrase(simple, term));
-                group = combine_query(tsquery_or, group, simple_phrase(english, term));
+                simple_group = or_phrase(simple_group, simple_phrase(simple, term));
+                english_group = or_phrase(english_group, simple_phrase(english, term));
             }
             else if (mode == LEGACY_REGEX)
             {
@@ -235,10 +234,31 @@ legacy_match(FunctionCallInfo fcinfo, LegacyMode mode)
             }
         }
         if (mode == LEGACY_FTS)
-            tsquery = combine_query(tsquery_and, tsquery, group);
+        {
+            if (!simple_group && !english_group)
+                continue;
+            if (simple_group)
+            {
+                if (!simple_vec)
+                    simple_vec = DirectFunctionCall2(to_tsvector_byid, ObjectIdGetDatum(simple),
+                                                     PointerGetDatum(document));
+                hit = DatumGetBool(DirectFunctionCall2(ts_match_vq, simple_vec, simple_group));
+            }
+            if (!hit && english_group)
+            {
+                if (!english_vec)
+                    english_vec = DirectFunctionCall2(to_tsvector_byid, ObjectIdGetDatum(english),
+                                                      PointerGetDatum(document));
+                hit = DatumGetBool(DirectFunctionCall2(ts_match_vq, english_vec, english_group));
+            }
+        }
         else if (mode == LEGACY_REGEX)
+        {
             appendStringInfoChar(&regex, ')');
-        else if (!hit)
+            hit = true;
+        }
+        has_terms = true;
+        if (!hit)
         {
             matched = false;
             break;
@@ -247,18 +267,6 @@ legacy_match(FunctionCallInfo fcinfo, LegacyMode mode)
     SPI_freeplan(plan);
     SPI_finish();
 
-    if (mode == LEGACY_FTS)
-    {
-        Datum doc = PointerGetDatum(document);
-        Datum vec;
-
-        if (!tsquery || DatumGetTSQuery(tsquery)->size == 0)
-            return false;
-        vec = DirectFunctionCall2(tsvector_concat,
-                                  DirectFunctionCall2(to_tsvector_byid, ObjectIdGetDatum(simple), doc),
-                                  DirectFunctionCall2(to_tsvector_byid, ObjectIdGetDatum(english), doc));
-        return DatumGetBool(DirectFunctionCall2(ts_match_vq, vec, tsquery));
-    }
     if (mode == LEGACY_REGEX)
         return DatumGetBool(DirectFunctionCall2Coll(textregexeq, PG_GET_COLLATION(),
                                                     PointerGetDatum(document),

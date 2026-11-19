@@ -145,6 +145,9 @@ END $$;
 DO $$ BEGIN
     IF NOT kor_search_tsvector('I''m in Seoul', '서울')
         OR NOT kor_search_tsvector('할 수 있다', 'can')
+        OR kor_search_tsvector('수 있다 할', 'can')
+        OR NOT kor_search_tsvector('the books', 'the 책')
+        OR kor_search_tsvector('books', 'the 책')
         OR kor_search_tsvector('data apple', '데이터 과학')
         OR NOT kor_search_like('I use O''Brien and Samsung', 'O''Brien 삼성')
         OR NOT kor_search_regex('가나다 Python 3', '(?i)python [0-9]')
