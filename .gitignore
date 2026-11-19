@@ -1,2 +1,6 @@
 *.o
 *.so
+*.bc
+/sql/kor_search--1.1.0.sql
+/sql/kor_search--2.0.0.sql
+/native/target/

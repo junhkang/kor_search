@@ -1,369 +1,291 @@
 #include "postgres.h"
-#include "fmgr.h"
-#include "utils/builtins.h"
-#include "utils/guc.h"
+
+#include "catalog/namespace.h"
 #include "catalog/pg_type.h"
 #include "executor/spi.h"
-#include "commands/trigger.h"
-#include <math.h>
-#include <string.h>
-#include <ctype.h>
-#include <regex.h>  // 정규식 관련 함수들을 사용하기 위한 헤더 파일
+#include "fmgr.h"
+#include "lib/stringinfo.h"
+#include "nodes/makefuncs.h"
+#include "tsearch/ts_type.h"
+#include "utils/builtins.h"
+#include "utils/fmgrprotos.h"
+#include "utils/lsyscache.h"
+#include "utils/memutils.h"
 
-#ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
-#endif
 
 PG_FUNCTION_INFO_V1(kor_search_like);
 PG_FUNCTION_INFO_V1(kor_search_similar);
 PG_FUNCTION_INFO_V1(kor_search_tsvector);
 PG_FUNCTION_INFO_V1(kor_search_regex);
 
-#define MAX_WORDS 1024
-#define MAX_WORD_LENGTH 128
+#define MAX_LEGACY_ALIASES 512
+#define LEGACY_WHITESPACE " \t\r\n\f\v"
+#define REGEX_META "\\.^$|?*+()[]{}"
 
-// 불용어 리스트 정의
-const char *stopwords_korean[] = {"는", "은", "이", "가", "을", "를", "에", "에서", "와", "과", "도", "의", "하다", NULL};
-const char *stopwords_english[] = {"am", "is", "are", "was", "were", "be", "been", "being", NULL};
+static void
+ascii_lower(char *str)
+{
+    for (; *str; str++)
+        *str = pg_ascii_tolower((unsigned char) *str);
+}
 
-// 함수 선언
-static bool similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count);
-static void to_lowercase(char *str);
+static char *
+legacy_lookup_sql(FunctionCallInfo fcinfo)
+{
+    char *schema = get_namespace_name(get_func_namespace(fcinfo->flinfo->fn_oid));
+    char *keywords = quote_qualified_identifier(schema, "kor_search_word_transform");
+    char *synonyms = quote_qualified_identifier(schema, "kor_search_word_synonyms");
 
-// 단어를 공백으로 토큰화하고 불용어를 처리
-static void tokenize_text(const char *input, char tokens[MAX_WORDS][MAX_WORD_LENGTH], int *token_count, const char **stopwords) {
-    char *token;
-    char input_copy[1024];
-    strncpy(input_copy, input, sizeof(input_copy));
-    input_copy[sizeof(input_copy) - 1] = '\0'; // Ensure null termination
-    token = strtok(input_copy, " ");
-    *token_count = 0;
+    return psprintf("SELECT DISTINCT k.keyword, s.synonym FROM %s k "
+                    "JOIN %s s ON k.id = s.keyword_id "
+                    "WHERE k.keyword = $1 OR s.synonym = $1",
+                    keywords, synonyms);
+}
 
-    while (token != NULL && *token_count < MAX_WORDS) {
-        bool is_stopword = false;
-        bool is_keyword_in_dict = false;
+static List *
+legacy_aliases(SPIPlanPtr plan, char *token)
+{
+    Datum args[] = {CStringGetTextDatum(token)};
+    MemoryContext context = CurrentMemoryContext;
+    List *aliases = NIL;
+    int status = SPI_execute_plan(plan, args, NULL, true, MAX_LEGACY_ALIASES + 1);
 
-        // 단어집에서 유사 단어를 찾으며, 해당 단어가 단어집에 있는지 확인
-        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-        int similar_count = 0;
-        is_keyword_in_dict = similar_search_words(token, similar_tokens, &similar_count);
+    if (status != SPI_OK_SELECT)
+        elog(ERROR, "kor_search dictionary lookup failed");
+    if (SPI_processed > MAX_LEGACY_ALIASES)
+        ereport(ERROR, (errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+                        errmsg("too many kor_search aliases for one term")));
 
-        // 불용어 처리 (단어집에 없을 때만 불용어로 처리)
-        if (!is_keyword_in_dict) {
-            if (!isalpha((unsigned char)token[0])) {
-                size_t token_len = strlen(token);
-                for (int i = 0; stopwords[i] != NULL; i++) {
-                    size_t stopword_len = strlen(stopwords[i]);
-                    if (token_len > stopword_len && strcmp(token + token_len - stopword_len, stopwords[i]) == 0) {
-                        token[token_len - stopword_len] = '\0';
-                        break;
-                    }
-                }
-            } else {
-                for (int i = 0; stopwords[i] != NULL; i++) {
-                    if (strcmp(token, stopwords[i]) == 0) {
-                        is_stopword = true;
-                        break;
-                    }
-                }
-            }
+    MemoryContextSwitchTo(context);
+    for (uint64 i = 0; i < SPI_processed; i++)
+    {
+        HeapTuple tuple = SPI_tuptable->vals[i];
+        TupleDesc desc = SPI_tuptable->tupdesc;
+
+        for (int col = 1; col <= 2; col++)
+        {
+            char *term = SPI_getvalue(tuple, desc, col);
+
+            if (term && *term)
+                aliases = lappend(aliases, term);
         }
+    }
+    SPI_freetuptable(SPI_tuptable);
+    return aliases;
+}
 
-        // 불용어가 아니라면 토큰을 추가
-        if (!is_stopword || is_keyword_in_dict) {
-            strncpy(tokens[*token_count], token, MAX_WORD_LENGTH);
-            tokens[*token_count][MAX_WORD_LENGTH - 1] = '\0'; // Ensure null termination
-            (*token_count)++;
+static bool
+legacy_stopword(const char *token)
+{
+    static const char *words[] = {"am", "is", "are", "was", "were", "be", "been", "being"};
+
+    for (int i = 0; i < lengthof(words); i++)
+        if (strcmp(token, words[i]) == 0)
+            return true;
+    return false;
+}
+
+static List *
+legacy_expand(SPIPlanPtr plan, const char *token)
+{
+    static const char *suffixes[] = {"에서", "하다", "는", "은", "이", "가", "을", "를", "에", "와", "과", "도", "의"};
+    char *key = pstrdup(token);
+    List *aliases;
+    size_t len;
+
+    ascii_lower(key);
+    aliases = legacy_aliases(plan, key);
+    if (aliases != NIL)
+        return lcons(key, aliases);
+    if (legacy_stopword(key))
+        return NIL;
+
+    len = strlen(key);
+    for (int i = 0; i < lengthof(suffixes); i++)
+    {
+        size_t suffix_len = strlen(suffixes[i]);
+
+        if (len > suffix_len && strcmp(key + len - suffix_len, suffixes[i]) == 0)
+        {
+            char *root = pnstrdup(key, len - suffix_len);
+
+            aliases = legacy_aliases(plan, root);
+            if (aliases != NIL)
+                aliases = lcons(root, aliases);
+            break;
         }
+    }
+    return lcons(key, aliases);
+}
 
-        token = strtok(NULL, " ");
+static Datum
+simple_phrase(Oid config, const char *term)
+{
+    return DirectFunctionCall2(phraseto_tsquery_byid, ObjectIdGetDatum(config),
+                               CStringGetTextDatum(term));
+}
+
+static Datum
+combine_query(PGFunction fn, Datum left, Datum right)
+{
+    if (!left || DatumGetTSQuery(right)->size == 0)
+        return (left && DatumGetTSQuery(left)->size > 0) ? left : right;
+    if (DatumGetTSQuery(left)->size == 0)
+        return right;
+    return DirectFunctionCall2(fn, left, right);
+}
+
+static void
+append_regex_literal(StringInfo pattern, const char *term)
+{
+    for (; *term; term++)
+    {
+        if (strchr(REGEX_META, *term))
+            appendStringInfoChar(pattern, '\\');
+        appendStringInfoChar(pattern, *term);
     }
 }
 
-static void to_lowercase(char *str) {
-    for (; *str; ++str) {
-        *str = tolower((unsigned char)*str);
+typedef enum { LEGACY_LIKE, LEGACY_SIMILAR, LEGACY_FTS, LEGACY_REGEX } LegacyMode;
+
+static bool
+legacy_match(FunctionCallInfo fcinfo, LegacyMode mode)
+{
+    text *document = PG_GETARG_TEXT_PP(0);
+    text *search = PG_GETARG_TEXT_PP(1);
+    char *input = text_to_cstring(document);
+    char *query = text_to_cstring(search);
+    char *saveptr;
+    char *lookup;
+    SPIPlanPtr plan;
+    MemoryContext caller = CurrentMemoryContext;
+    StringInfoData regex = {0};
+    Datum tsquery = 0;
+    Oid simple = InvalidOid;
+    Oid english = InvalidOid;
+    bool matched = true;
+    bool has_terms = false;
+
+    if (mode == LEGACY_REGEX && strpbrk(query, REGEX_META))
+        return DatumGetBool(DirectFunctionCall2Coll(textregexeq, PG_GET_COLLATION(),
+                                                    PointerGetDatum(document), PointerGetDatum(search)));
+    if (mode == LEGACY_LIKE || mode == LEGACY_SIMILAR)
+    {
+        ascii_lower(input);
+        ascii_lower(query);
+        if (mode == LEGACY_LIKE && strstr(input, query))
+            return true;
     }
+    if (mode == LEGACY_REGEX)
+        initStringInfo(&regex);
+    if (mode == LEGACY_FTS)
+    {
+        simple = get_ts_config_oid(list_make2(makeString("pg_catalog"), makeString("simple")), false);
+        english = get_ts_config_oid(list_make2(makeString("pg_catalog"), makeString("english")), false);
+    }
+
+    lookup = legacy_lookup_sql(fcinfo);
+    if (SPI_connect() != SPI_OK_CONNECT)
+        elog(ERROR, "could not connect to the kor_search dictionary");
+    plan = SPI_prepare(lookup, 1, (Oid[]) {TEXTOID});
+    if (!plan)
+        elog(ERROR, "could not prepare the kor_search dictionary lookup");
+    MemoryContextSwitchTo(caller);
+
+    for (char *token = strtok_r(query, LEGACY_WHITESPACE, &saveptr);
+         token; token = strtok_r(NULL, LEGACY_WHITESPACE, &saveptr))
+    {
+        List *aliases = legacy_expand(plan, token);
+        ListCell *entry;
+        Datum group = 0;
+        bool hit = false;
+        bool first = true;
+
+        if (aliases == NIL)
+            continue;
+        if (mode == LEGACY_REGEX)
+            appendStringInfoString(&regex, has_terms ? ".*(" : "(");
+        has_terms = true;
+
+        foreach(entry, aliases)
+        {
+            char *term = lfirst(entry);
+
+            if (mode == LEGACY_FTS)
+            {
+                group = combine_query(tsquery_or, group, simple_phrase(simple, term));
+                group = combine_query(tsquery_or, group, simple_phrase(english, term));
+            }
+            else if (mode == LEGACY_REGEX)
+            {
+                if (!first)
+                    appendStringInfoChar(&regex, '|');
+                append_regex_literal(&regex, first ? token : term);
+                first = false;
+            }
+            else
+            {
+                ascii_lower(term);
+                if (strstr(input, term))
+                {
+                    hit = true;
+                    break;
+                }
+            }
+        }
+        if (mode == LEGACY_FTS)
+            tsquery = combine_query(tsquery_and, tsquery, group);
+        else if (mode == LEGACY_REGEX)
+            appendStringInfoChar(&regex, ')');
+        else if (!hit)
+        {
+            matched = false;
+            break;
+        }
+    }
+    SPI_freeplan(plan);
+    SPI_finish();
+
+    if (mode == LEGACY_FTS)
+    {
+        Datum doc = PointerGetDatum(document);
+        Datum vec;
+
+        if (!tsquery || DatumGetTSQuery(tsquery)->size == 0)
+            return false;
+        vec = DirectFunctionCall2(tsvector_concat,
+                                  DirectFunctionCall2(to_tsvector_byid, ObjectIdGetDatum(simple), doc),
+                                  DirectFunctionCall2(to_tsvector_byid, ObjectIdGetDatum(english), doc));
+        return DatumGetBool(DirectFunctionCall2(ts_match_vq, vec, tsquery));
+    }
+    if (mode == LEGACY_REGEX)
+        return DatumGetBool(DirectFunctionCall2Coll(textregexeq, PG_GET_COLLATION(),
+                                                    PointerGetDatum(document),
+                                                    has_terms ? CStringGetTextDatum(regex.data) : PointerGetDatum(search)));
+    return has_terms && matched;
 }
 
 Datum
 kor_search_like(PG_FUNCTION_ARGS)
 {
-    text *input_text = PG_GETARG_TEXT_PP(0);
-    text *search_text = PG_GETARG_TEXT_PP(1);
-    char *input;
-    char *search;
-    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
-    int token_count_search;
-    int i, k;
-    bool token_found;
-
-    input = text_to_cstring(input_text);
-    search = text_to_cstring(search_text);
-
-    // 입력 텍스트와 검색어를 소문자로 변환
-    to_lowercase(input);
-    to_lowercase(search);
-
-    // 1. 검색어 자체가 입력 텍스트에 포함되어 있는지 확인
-    if (strstr(input, search) != NULL) {
-        PG_RETURN_BOOL(true);
-    }
-
-    // 검색어를 토큰화
-    tokenize_text(search, tokens_search, &token_count_search, isalpha((unsigned char)search[0]) ? stopwords_english : stopwords_korean);
-
-    // 각 토큰에 대해 단어집에서 유사 단어 검색 후, 입력 텍스트와 비교
-    for (i = 0; i < token_count_search; i++) {
-        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-        int similar_count;
-
-        // 유사 단어 찾기
-        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
-
-        token_found = false;
-
-        // 유사 단어가 입력 텍스트에 포함되어 있는지 확인
-        for (k = 0; k < similar_count; k++) {
-            // 유사 단어를 소문자로 변환 후 비교
-            to_lowercase(similar_tokens[k]);
-            if (strstr(input, similar_tokens[k]) != NULL) {
-                token_found = true;
-                break;
-            }
-        }
-
-        if (!token_found) {
-            PG_RETURN_BOOL(false);
-        }
-    }
-
-    PG_RETURN_BOOL(true);
-}
-
-static bool similar_search_words(const char *token, char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH], int *similar_count) {
-    char query[8192];
-    int ret, proc;
-    uint64 i;
-    bool is_in_dictionary = false;
-
-    // 단어집에서 유사한 단어와 동의어를 검색하고 자기 자신을 포함하는 쿼리
-    snprintf(query, sizeof(query),
-             "SELECT DISTINCT k.keyword, s.synonym FROM kor_search_word_transform k "
-             "JOIN kor_search_word_synonyms s ON k.id = s.keyword_id "
-             "WHERE k.keyword = '%s' OR s.synonym = '%s'",
-             token, token);
-
-    // 쿼리 실행 전에 선언과 함께 사용
-    SPI_connect();
-    ret = SPI_execute(query, true, 0);
-    proc = SPI_processed;
-
-    *similar_count = 0;
-    if (ret > 0 && SPI_tuptable != NULL) {
-        is_in_dictionary = (proc > 0); // 단어가 단어집에 존재하는지 확인
-        for (i = 0; i < proc; i++) {
-            char *keyword = SPI_getvalue(SPI_tuptable->vals[i], SPI_tuptable->tupdesc, 1);
-            char *synonym = SPI_getvalue(SPI_tuptable->vals[i], SPI_tuptable->tupdesc, 2);
-
-            // keyword 추가
-            strncpy(similar_tokens[*similar_count], keyword, MAX_WORD_LENGTH);
-            similar_tokens[*similar_count][MAX_WORD_LENGTH - 1] = '\0';
-            (*similar_count)++;
-
-            // synonym 추가
-            strncpy(similar_tokens[*similar_count], synonym, MAX_WORD_LENGTH);
-            similar_tokens[*similar_count][MAX_WORD_LENGTH - 1] = '\0';
-            (*similar_count)++;
-        }
-    }
-
-    SPI_finish();
-
-    return is_in_dictionary;
+    PG_RETURN_BOOL(legacy_match(fcinfo, LEGACY_LIKE));
 }
 
 Datum
 kor_search_similar(PG_FUNCTION_ARGS)
 {
-    text *input_text = PG_GETARG_TEXT_PP(0);
-    text *search_text = PG_GETARG_TEXT_PP(1);
-    char *input;
-    char *search;
-    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
-    int token_count_search;
-    int i, k;
-    bool result = true;
-
-    input = text_to_cstring(input_text);
-    search = text_to_cstring(search_text);
-
-    // 입력 텍스트를 소문자로 변환
-    to_lowercase(input);
-
-    // 검색 텍스트(검색 문장)를 토큰화
-    tokenize_text(search, tokens_search, &token_count_search, isalpha((unsigned char)search[0]) ? stopwords_english : stopwords_korean);
-
-    // 검색 텍스트(검색 단어)의 각 토큰에 대해 유사 단어 검색
-    for (i = 0; i < token_count_search; i++) {
-        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-        int similar_count = 0;
-        bool token_found = false;
-
-        // 유사 단어 검색
-        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
-
-        // 유사 단어 중 하나라도 입력 텍스트에 포함되어 있는지 확인
-        for (k = 0; k < similar_count; k++) {
-            // 유사 단어를 소문자로 변환 후 비교
-            to_lowercase(similar_tokens[k]);
-            if (strstr(input, similar_tokens[k]) != NULL) {
-                token_found = true;
-                break;
-            }
-        }
-
-        // 하나라도 매칭되지 않으면 false 반환
-        if (!token_found) {
-            result = false;
-            break;
-        }
-    }
-
-    PG_RETURN_BOOL(result);
+    PG_RETURN_BOOL(legacy_match(fcinfo, LEGACY_SIMILAR));
 }
 
 Datum
 kor_search_tsvector(PG_FUNCTION_ARGS)
 {
-    text *input_text = PG_GETARG_TEXT_PP(0);
-    text *search_text = PG_GETARG_TEXT_PP(1);
-    bool result = false;
-
-    char *input = text_to_cstring(input_text);
-    char *search = text_to_cstring(search_text);
-
-    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
-    int token_count_search;
-    char tsquery[8192] = "";
-    char query[8192];
-    int i, k;
-    int ret; // 변수 선언을 함수 시작 부분으로 이동
-    char token_group[8192] = ""; // 변수 선언을 함수 시작 부분으로 이동
-
-    // 불용어를 제거하고 텍스트를 토큰화
-    tokenize_text(search, tokens_search, &token_count_search, isalpha((unsigned char)search[0]) ? stopwords_english : stopwords_korean);
-
-    for (i = 0; i < token_count_search; i++) {
-        char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-        int similar_count;
-
-        similar_search_words(tokens_search[i], similar_tokens, &similar_count);
-
-        // 유사 단어들을 "token1 | token2 | ..." 형태로 결합
-        for (k = 0; k < similar_count; k++) {
-            if (strlen(token_group) > 0) {
-                strncat(token_group, " | ", sizeof(token_group) - strlen(token_group) - 1);
-            }
-            strncat(token_group, similar_tokens[k], sizeof(token_group) - strlen(token_group) - 1);
-        }
-
-        // 여러 유사 단어 그룹을 "&" 연산자로 연결
-        if (strlen(tsquery) > 0) {
-            strncat(tsquery, " & ", sizeof(tsquery) - strlen(tsquery) - 1);
-        }
-        strncat(tsquery, token_group, sizeof(tsquery) - strlen(tsquery) - 1);
-    }
-
-    if (strlen(tsquery) == 0) {
-        PG_RETURN_BOOL(false);
-    }
-
-    snprintf(query, sizeof(query),
-             "SELECT (to_tsvector('english', '%s') || to_tsvector('simple', '%s')) @@ to_tsquery('simple', '%s');",
-             input, input, tsquery);
-
-    // 쿼리 실행
-    SPI_connect();
-    ret = SPI_execute(query, true, 0); // 이 줄도 필요한 부분으로 이동
-    if (ret > 0 && SPI_processed > 0) {
-        bool tsvector_result = (strcmp(SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1), "t") == 0);
-        result = tsvector_result;
-    }
-    SPI_finish();
-
-    PG_RETURN_BOOL(result);
+    PG_RETURN_BOOL(legacy_match(fcinfo, LEGACY_FTS));
 }
-
 
 Datum
 kor_search_regex(PG_FUNCTION_ARGS)
 {
-    text *input_text = PG_GETARG_TEXT_PP(0);
-    text *pattern = PG_GETARG_TEXT_PP(1);
-    char *input;
-    char *regex_pattern;
-    char expanded_pattern[8192] = "";
-    regex_t regex;
-    int i, k;
-    bool result = false;
-
-    // 추가된 변수 선언
-    char tokens_search[MAX_WORDS][MAX_WORD_LENGTH];
-    int token_count_search;
-    int ret;
-
-    input = text_to_cstring(input_text);
-    regex_pattern = text_to_cstring(pattern);
-
-    // 알파벳이나 한글이 아닌 패턴은 그대로 확장된 패턴에 추가
-    if (!isalpha((unsigned char)regex_pattern[0]) && (unsigned char)regex_pattern[0] < 128) {
-        strncpy(expanded_pattern, regex_pattern, sizeof(expanded_pattern) - 1);
-    } else {
-        tokenize_text(regex_pattern, tokens_search, &token_count_search,
-                      isalpha((unsigned char)regex_pattern[0]) ? stopwords_english : stopwords_korean);
-
-        for (i = 0; i < token_count_search; i++) {
-            char similar_tokens[MAX_WORDS][MAX_WORD_LENGTH];
-            int similar_count;
-            similar_search_words(tokens_search[i], similar_tokens, &similar_count);
-
-            // 단어가 변환된 경우 정규식 패턴에 포함
-            if (similar_count > 0) {
-                strncat(expanded_pattern, "(", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
-                for (k = 0; k < similar_count; k++) {
-                    if (k > 0) {
-                        strncat(expanded_pattern, "|", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
-                    }
-                    strncat(expanded_pattern, similar_tokens[k], sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
-                }
-                strncat(expanded_pattern, ")", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
-            } else {
-                // 변환되지 않은 경우 원래 토큰 사용
-                if (strlen(expanded_pattern) > 0) {
-                    strncat(expanded_pattern, ".*", sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
-                }
-                strncat(expanded_pattern, tokens_search[i], sizeof(expanded_pattern) - strlen(expanded_pattern) - 1);
-            }
-        }
-    }
-
-    // 확장된 패턴이 없으면 원래 패턴 사용
-    if (strlen(expanded_pattern) == 0) {
-        strncpy(expanded_pattern, regex_pattern, sizeof(expanded_pattern) - 1);
-    }
-
-    // 정규식 컴파일 및 매칭 검사
-    ret = regcomp(&regex, expanded_pattern, REG_EXTENDED | REG_NOSUB);
-    if (ret) {
-        elog(ERROR, "Could not compile regex: %s", expanded_pattern);
-    }
-
-    // 정규식 매칭 검사
-    if (regexec(&regex, input, 0, NULL, 0) == 0) {
-        result = true;
-    }
-
-    regfree(&regex);
-    PG_RETURN_BOOL(result);
+    PG_RETURN_BOOL(legacy_match(fcinfo, LEGACY_REGEX));
 }
