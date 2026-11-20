@@ -1,5 +1,5 @@
 # kor_search.control
 comment = 'PostgreSQL extension for Korean text search'
-default_version = '1.0.0'
+default_version = '2.0.0'
 module_pathname = '$libdir/kor_search'
 relocatable = true

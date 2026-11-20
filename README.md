@@ -1,202 +1,62 @@
-<p align="right">
-  <a href="#"><img src="https://upload.wikimedia.org/wikipedia/commons/0/09/Flag_of_South_Korea.svg" width="30"></a>
-   <a href="/localization/en/README.md"><img src="https://upload.wikimedia.org/wikipedia/en/a/a4/Flag_of_the_United_States.svg" width="30"></a>
-</p>
+<p align="right"><a href="localization/en/README.md">English</a></p>
 
 # kor_search
 
-PostgreSQL용 한국어 텍스트 검색 확장.
-
-## 설명
-
-`kor_search` 확장은 한국어와 영어 텍스트 간의 검색 기능을 제공하는 PostgreSQL 확장입니다. 번역기, 형태소 분석기 등의 외부 API 의존 없이 개발되었으며, 주로 단어 검색에 최적화되어 있습니다. 문장 대 문장 검색도 어느 정도 가능하지만, 이 확장은 주로 단어 기반의 검색을 위해 설계되었습니다.
-
-특히, 이 확장은 번역을 위한 기능이 아닌, 영어와 한글의 혼용으로 인해 원하는 키워드를 검색하지 못하는 경우를 해결하기 위한 것입니다. 예를 들어, 사용자가 한국어로 검색했지만 텍스트가 영어로 기록되어 있는 경우, 또는 그 반대의 상황에서 효과적으로 검색할 수 있도록 돕습니다.
-
-이 확장은 PostgreSQL을 설치한 환경(로컬, EC2 등)에서 사용할 수 있으며, 외부 익스텐션 사용이 제한된 환경(RDS)에서 대체로 사용할 수 있는 함수도 제공하고 있습니다.
-
-초기에는 기본 프레임과 몇 가지 기본적인 단어들만 등록되어 있습니다. 따라서, 원하는 사업군이나 영역에 맞춰 단어집을 추가로 설정해야지 최적의 성능을 발휘할 수 있습니다.
-
-### 주요 기능
-
-- **LIKE 검색**: 입력된 텍스트가 지정된 검색어와 일치하거나 포함되는지 확인합니다.
-- **tsvector 검색**: 텍스트를 tsvector 형식으로 변환하여 유사 단어 검색을 지원합니다.
-- **정규식 검색**: 복잡한 검색 조건을 위한 정규식 검색을 제공합니다.
-- **유사성 검색**: 단어집을 기반으로 문장 간 유사성을 평가합니다.
-
-### 유연한 맞춤형 검색
-
-`kor_search`는 내부 테이블 데이터를 변경하여 사업군 또는 특정 필드에 맞춘 검색을 제공할 수 있습니다. 예를 들어, 산업의 역군에서는 건설 관련 데이터를 많이 적용하여, 건설 산업에 최적화된 검색을 구현하여 사용 중입니다.
-
-### 성능 고려 사항
-
-단어집의 용량에 따라 대량 데이터를 조회할 때 성능 저하가 발생할 수 있으므로, 성능 분석이 필수적입니다. 또한, 외부 익스텐션 사용이 제한된 RDS 환경에서도 유사한 기능을 제공하는 함수들이 구현되어 있지만, 성능 면에서 본격적인 익스텐션만큼 뛰어나지는 않습니다.
+**PostgreSQL에서 한영 혼용 텍스트를 검색하는 네이티브 확장입니다.** `samsung`으로 `삼성에서`를 찾고, 건설 사전을 선택하면 `RC`로 `철근콘크리트`를 찾습니다. Rust와 Lindera/ko-dic으로 문서를 분석하고 PostgreSQL 기본 GIN 인덱스를 사용합니다. 실행 시 외부 검색 서버나 API가 필요 없습니다.
 
 ## 설치
 
-### PGXN을 통한 설치
+Linux, UTF-8 데이터베이스, PostgreSQL 16–18 및 해당 메이저 버전의 서버 개발 헤더, C 컴파일러, Make, Rust(rustup)가 필요합니다. 빌드 시 Cargo가 의존성과 ko-dic을 내려받습니다.
 
-1. `kor_search`는 [PGXN(PostgreSQL Extension Network)](https://pgxn.org/)에 공식 등록된 확장입니다. PGXN을 통해 간단한 명령어로 확장을 설치할 수 있습니다:
-
-```sh
-pgxn install kor_search
+```bash
+make PG_CONFIG=/path/to/pg_config
+sudo make PG_CONFIG=/path/to/pg_config install
+psql -X -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION kor_search;'
+psql -X -v ON_ERROR_STOP=1 -f dictionaries/examples.sql # 선택: 예제 단어집
 ```
 
-2. 그런 다음, PostgreSQL 데이터베이스에 접속하여 확장을 활성화합니다:
+`pg_config`가 PATH에 있으면 `PG_CONFIG=...`는 생략합니다. PostgreSQL 서버에 바이너리와 SQL 설치 파일을 설치할 권한이 필요합니다. 자체 바이너리를 설치할 수 없는 RDS 등의 환경에서 2.0을 지원한다고 가정하지 마세요. 기존 RDS SQL 스크립트는 1.x 참고용이며 2.0 호환 경로가 아닙니다.
 
-    ```sh
-    psql -U your_username -d your_database
-    CREATE EXTENSION kor_search;
-    ```
-
-### 로컬 PostgreSQL 또는 EC2에서
-
-1. 먼저 PostgreSQL 익스텐션을 빌드하고 설치하려면 다음 명령어를 실행하세요:
-
-    ```sh
-    make
-    sudo make install
-    ```
-
-2. 그런 다음, PostgreSQL 데이터베이스에 접속하여 확장을 활성화합니다:
-
-    ```sh
-    psql -U your_username -d your_database
-    CREATE EXTENSION kor_search;
-    ```
-
-### Amazon RDS에서
-
-1. RDS 인스턴스에 접속합니다. 예를 들어, `psql`을 사용하여 접속할 수 있습니다:
-
-    ```sh
-    psql -h your-rds-endpoint -U your-username -d your-database
-    ```
-
-2. `kor_search_rds.sql` 파일의 내용을 직접 복사하여 RDS 인스턴스의 SQL 프롬프트에 붙여넣어 실행합니다. 이 파일에는 `kor_search`의 기능을 구현하기 위한 SQL 코드가 포함되어 있습니다.
-
-## 함수
-
-### kor_search_similar
-
-- `kor_search_similar(input_text text, search_text text)`: `input_text`가 `search_text`와 의미적으로 유사한지 판단합니다. 이 함수는 단어집에 등록된 유사어를 기반으로 문장 간의 유사성을 평가합니다.
-
-#### 사용 예시:
-
-1. 문장 간 유사성 검사:
-
-    ```sql
-    -- '밥 먹다'와 'I eat rice'가 의미적으로 유사하므로 TRUE를 기대함
-    SELECT kor_search_similar('I eat rice', '밥 먹다');  -- 결과: true
-
-    -- '서울 살다'와 'She lives in Seoul'이 의미적으로 유사하므로 TRUE를 기대함
-    SELECT kor_search_similar('She lives in Seoul', '서울 살다');  -- 결과: true
-
-    -- '차가 빠르다'와 'The car is fast'가 의미적으로 유사하므로 TRUE를 기대함
-    SELECT kor_search_similar('The car is fast', '차가 빠르다');  -- 결과: true
-    ```
-
-### kor_like
-
-- `kor_like(input_text text, search_text text)`: `search_text`에 해당하는 synonyms가 `input_text`에 포함되어 있는지 LIKE 쿼리로 확인합니다.
-
-#### 사용 예시:
-
-1. 단어 포함 여부 검사:
-
-    ```sql
-    -- 'lg' 키워드로 '엘지', '앨지'를 검색
-    SELECT kor_like('이것은 엘지 제품입니다', 'lg');  -- 결과: true
-    SELECT kor_like('이것은 LG 제품입니다', '엘지');  -- 결과: true
-
-    -- 'apple' 키워드로 '애플', '사과'를 검색
-    SELECT kor_like('애플은 훌륭한 과일입니다', 'apple');  -- 결과: true
-    SELECT kor_like('사과를 좋아합니다', 'apple');  -- 결과: true
-    SELECT kor_like('Apple은 과일입니다', '사과');  -- 결과: true
-    ```
-
-### kor_search_tsvector
-
-- `kor_search_tsvector(input_text text, search_text text)`: `search_text`에 해당하는 synonyms가 `input_text`의 tsvector에 포함되어 있는지 확인합니다.
-
-#### 사용 예시:
-
-1. tsvector를 사용한 유사 단어 검색:
-
-    ```sql
-    -- 'data science' 키워드로 '데이터 과학', '데이터 사이언스'를 검색
-    SELECT kor_search_tsvector('데이터 과학은 미래의 유망한 분야입니다', 'data science');  -- 결과: true
-    SELECT kor_search_tsvector('데이터 사이언스는 많은 가능성을 제공합니다', 'data science');  -- 결과: true
-    SELECT kor_search_tsvector('Data Science는 많은 가능성을 제공합니다', '데이터 과학');  -- 결과: true
-
-    -- 'machine learning' 키워드로 '머신러닝', '기계학습'을 검색
-    SELECT kor_search_tsvector('머신러닝 기술이 발전하고 있습니다', 'machine learning');  -- 결과: true
-    SELECT kor_search_tsvector('기계학습 알고리즘을 연구합니다', 'machine learning');  -- 결과: true
-    SELECT kor_search_tsvector('Machine Learning 알고리즘을 연구합니다', '기계학습');  -- 결과: true
-    ```
-
-### kor_regex_search
-
-- `kor_regex_search(input_text text, pattern text)`: 정규식 패턴이 `input_text`에 매칭되는지 확인합니다.
-
-#### 사용 예시:
-
-1. 정규식 검색:
-
-    ```sql
-    -- 정규식을 사용하여 특정 단어 패턴 검색
-    SELECT kor_regex_search('자바는 강력한 언어입니다', '자바|파이썬');  -- 결과: true
-    SELECT kor_regex_search('파이썬은 배우기 쉬운 언어입니다', '자바|파이썬');  -- 결과: true
-    SELECT kor_regex_search('JAVA와 PYTHON은 인기있는 언어입니다', '(?i)자바|파이썬');  -- 결과: true
-
-    -- 'big data'와 '대용량 데이터'를 정규식으로 검색
-    SELECT kor_regex_search('빅데이터 분석이 중요합니다', '빅데이터|대용량 데이터');  -- 결과: true
-    SELECT kor_regex_search('대용량 데이터를 처리합니다', '빅데이터|대용량 데이터');  -- 결과: true
-    SELECT kor_regex_search('Big Data는 현대 기술의 핵심입니다', '(?i)빅데이터|대용량 데이터');  -- 결과: true
-    ```
-
-## 단어 변환 테이블 관리
-
-단어 변환 테이블에 새로운 키워드와 유사어를 추가할 수 있습니다. 예를 들어, 'apple' 키워드에 대한 유사어를 추가하려면 다음과 같이 합니다:
+## 첫 검색
 
 ```sql
-INSERT INTO kor_search_word_transform (keyword)
-VALUES ('apple');
+CREATE TABLE documents (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, body text NOT NULL);
+INSERT INTO documents (body) VALUES ('삼성에서 PostgreSQL을 사용한다'), ('철근콘크리트 구조를 설계했다');
+CREATE INDEX documents_search ON documents USING gin (kor_vector_v1(body));
 
-INSERT INTO kor_search_word_synonyms (keyword_id, synonym)
-VALUES ((SELECT id FROM kor_search_word_transform WHERE keyword = 'apple'), '애플');
+PREPARE search_docs(text, text) AS
+SELECT id, body FROM documents
+WHERE kor_vector_v1(body) @@ (SELECT kor_search_tsquery($1, $2));
+
+EXECUTE search_docs('samsung', 'general');
+EXECUTE search_docs('RC', 'construction');
 ```
 
-## 제거
+예제 단어집 기준입니다. `(SELECT ...)`는 쿼리당 한 번 검색어를 확장하고, 인덱스는 후보 행을 찾습니다. 문구 검색의 인덱스 재검사 비용이 크다면 `kor_vector_v1(body)`를 저장 생성 열로 만들고 그 열에 GIN을 만드세요.
 
-### 로컬 PostgreSQL 또는 EC2에서
+| API | 동작 |
+|---|---|
+| `kor_analyze_v1(text)` | NFC 정규화 및 형태소 분석 결과를 공백 단위로 확인합니다. |
+| `kor_vector_v1(text)` | 문서를 버전이 고정된 `tsvector`로 바꿉니다. GIN 표현식에 사용할 수 있습니다. |
+| `kor_search_tsquery(text, scope DEFAULT 'general')` | 일반 텍스트를 분석해 사전을 확장합니다. 빈 검색어는 NULL입니다. |
 
-로컬 PostgreSQL 또는 EC2에서 확장을 제거하려면 다음 단계를 따르세요:
+## 업무 단어집
 
-1. PostgreSQL 데이터베이스에 접속합니다.
+설치 시 2.0 사전은 비어 있습니다. 등록된 표현 중 가장 긴 문구를 먼저 찾고, 같은 범위·개념의 표현을 OR로, 나머지 토큰 그룹을 AND로 묶습니다. 등록하지 않은 단어는 자기 자신으로 검색됩니다. 문구는 분석 후 토큰 순서로 판단합니다. 사전을 변경해도 문서 재색인은 필요 없습니다.
 
-    ```sh
-    psql -U your_username -d your_database
-    ```
+```sql
+INSERT INTO kor_search_aliases (scope, concept, term, kind) VALUES
+    ('construction', 'job-site', '공사 현장', 'label'),
+    ('construction', 'job-site', 'job site', 'translation');
+```
 
-2. 확장을 제거합니다.
+같은 범위에서 정규화된 표현은 하나의 개념에만 속합니다. `apple`을 기술·소매 범위에 별도로 등록하는 예는 예제 사전을 참고하세요. 범위는 **사전 선택**일 뿐 문서 필터나 접근 제어가 아닙니다. 검색 계정에는 확장 스키마의 `USAGE`와 별칭 테이블의 `SELECT` 권한을 따로 부여하세요. 사전 팩 기여 시 출처와 재배포 가능 여부를 명시해 주세요.
 
-    ```sql
-    DROP EXTENSION kor_search;
-    ```
+한국어 분석은 오탐을 모두 제거하지 않습니다(예: 서울역이 서울로 검색될 수 있음). 부분 문자열·초성·자동 번역·영어 어간 검색은 지원하지 않습니다. 최대 문서 512 KiB, 검색어 4 KiB/64 토큰, 별칭 문구 8 토큰, 개념당 검색 확장 32개입니다. PostgreSQL `tsvector`의 토큰 및 위치 한도도 적용됩니다.
 
-### Amazon RDS에서
+## 업그레이드 및 검증
 
-Amazon RDS에서 확장을 제거하려면 다음 단계를 따르세요:
-
-1. RDS 인스턴스에 접속합니다.
-
-    ```sh
-    psql -h your-rds-endpoint -U your-username -d your-database
-    ```
-
-2. `uninstall_kor_search.sql` 파일의 내용을 직접 실행하여 확장을 제거합니다:
-
-    ```sql
-    \i path/to/uninstall_kor_search.sql
-    ```
+- 기존 서버에 새 빌드를 설치하고 유지보수 시간에 **기존 연결을 재시작/재연결**한 뒤 `ALTER EXTENSION kor_search UPDATE TO '2.0.0';`를 실행하세요. 중간 버전으로 별도 업데이트할 필요는 없습니다.
+- 기존 함수 네 개와 레거시 테이블은 유지됩니다. 새 검색에 사용할 업무 용어는 범위·개념을 검토한 뒤 별칭 테이블에 등록하세요. 1.x 기본 행을 직접 수정·삭제했다면 일반 `pg_dump`에서 복원되지 않으므로 두 레거시 테이블을 별도로 백업하세요. 자동 테스트는 추가 행과 새 별칭의 복원을 확인합니다.
+- 설치 시 사용자 지정 스키마를 선택할 수 있지만 2.0 설치 후에는 `ALTER EXTENSION ... SET SCHEMA`를 지원하지 않습니다. 향후 분석 규칙이 바뀌면 새 버전 함수와 인덱스를 병행할 계획입니다.
+- `bash test/run.sh`로 설치·업그레이드·복원을 검증합니다. [평가셋과 벤치마크](bench/README.md) · [변경 내역](CHANGELOG.md).

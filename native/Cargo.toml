@@ -1,0 +1,14 @@
+[package]
+name = "kor-search-analyzer"
+version = "2.0.0"
+edition = "2021"
+publish = false
+license = "MIT"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+lindera = { version = "=6.2.0", default-features = false }
+lindera-ko-dic = { version = "=6.2.0", features = ["embed-ko-dic"] }
+unicode-normalization = "0.1"

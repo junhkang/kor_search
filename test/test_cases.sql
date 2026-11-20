@@ -126,8 +126,8 @@ END IF;
         RAISE EXCEPTION 'kor_search_tsvector test failed for case 5';
 END IF;
 
-    -- '오렌지 먹다'라는 검색어가 'He eats an orange'의 텍스트와 유사하므로 TRUE를 기대함
-    IF NOT (SELECT kor_search_tsvector('He eats an orange', '오렌지를 먹다')) THEN
+    -- The shipped dictionary contains 사과/apple, not 오렌지/orange.
+    IF NOT (SELECT kor_search_tsvector('He eats an apple', '사과를 먹다')) THEN
         RAISE EXCEPTION 'kor_search_tsvector test failed for case 6';
 END IF;
 
@@ -140,6 +140,20 @@ END IF;
     IF NOT (SELECT kor_search_tsvector('The computer is fast', '컴퓨터')) THEN
         RAISE EXCEPTION 'kor_search_tsvector test failed for case 8';
 END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT kor_search_tsvector('I''m in Seoul', '서울')
+        OR NOT kor_search_tsvector('할 수 있다', 'can')
+        OR kor_search_tsvector('수 있다 할', 'can')
+        OR NOT kor_search_tsvector('the books', 'the 책')
+        OR kor_search_tsvector('books', 'the 책')
+        OR kor_search_tsvector('data apple', '데이터 과학')
+        OR NOT kor_search_like('I use O''Brien and Samsung', 'O''Brien 삼성')
+        OR NOT kor_search_regex('가나다 Python 3', '(?i)python [0-9]')
+        OR NOT kor_search_regex('I eat rice', '밥') THEN
+        RAISE EXCEPTION 'legacy literal, phrase or regex regression';
+    END IF;
 END $$;
 
 -- -- kor_search_regex Tests
